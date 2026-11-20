@@ -63,3 +63,8 @@ ASIC-level model + synthesis at an edge-NPU balance (beta ~100-200, G >= 16) for
 3. **Write both tracks up as a doc** for a meeting with Sitao Huang / HeteroVLM authors.
 
 Also cite in FPGA work: BitNest (Yanzhi Wang, 2610.02800). "Precision on Demand" 2611.14418 is unknown authors, sim only.
+
+## Update 2026-11-19 (hub session)
+- **B killed.** eta on GPUs: GEMMs mix for free; mixed-batch loss is only in attention and is fixable in software (4090 layer eta 0.88-0.98 at B<=4; GB10 flex mixing even faster than separate at B<=4). Energy leg fails on KV260: static power is 70-81% of window energy; task-level saving 0.2-11%; and the user's own accuracy data inverts the W4-decode/W8-prefill premise (generation needs 6-8 bit). See bench/results, pdmodel/kill_b.py.
+- **D (cross-model state reuse for hybrid models): core taken.** LatentPort (2609.25053, single author), HST (2611.08133, SCUT), 2611.12062 (Hostinger Research, strongest), plus KV-Lingo (2609.32610, Apple) for transformers. Open: engine integration, Mamba-2 hybrids, transfer-vs-reprefill policy on unified memory, selective recompute with recurrent state. Demand caveat: same-model prefix reuse is already 95-98% in Spark agent serving reports.
+- **C (role-aware KV precision for agents): core taken** by TriAxialKV (2605.17170, Cambridge/Imperial, NeurIPS 2026): per-role (inst/obs/tool_call/...) INT2/INT4 KV, BFCL Memory + OSWorld, B200/H100. Open: batch-1 bandwidth-bound edge decode (GB10/Mac), FP8/NVFP4 formats, small models, weight x KV precision co-design per segment, calibration-free policy, hardware encoder. Kill test: is UNIFORM NVFP4 KV already near-lossless on BFCL/tau-bench? (NVIDIA/LMSYS report <1-1.6 pt loss, no tool-calling eval.)

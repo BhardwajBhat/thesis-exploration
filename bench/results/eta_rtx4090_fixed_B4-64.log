@@ -1,0 +1,236 @@
+# device NVIDIA GeForce RTX 4090  torch 2.6.0+cu124  calibrated BF16 168.2 TFLOPS, copy BW 913 GB/s, beta=92 MAC/B
+ mode  B   ctx    C  part kind    t_dec   t_pre   t_mix  eff_sep eff_mix   eta sep/mix
+fixed  4  2048  252  gemm    -      488     717     725     0.83    0.81  0.98    1.66
+fixed  4  2048  252  attn   fa       63      89     144     0.59    0.38  0.64    1.06
+fixed  4  2048  252 layer   fa      545     788     838     0.82    0.77  0.93    1.59
+fixed  4  2048  252  attn flex       71     157     624     0.40    0.09  0.22    0.37
+fixed  4  2048  252 layer flex      543     850    1321     0.78    0.49  0.62    1.05
+fixed  4  2048  252  attn best       29      85     140     0.79    0.39  0.49    0.81
+fixed  4  2048  252 layer best      533     786     837     0.83    0.77  0.93    1.58
+fixed  4  2048  508  gemm    -      487    1305    1334     0.89    0.88  0.99    1.34
+fixed  4  2048  508  attn   fa       61     160     224     0.68    0.51  0.75    0.99
+fixed  4  2048  508 layer   fa      544    1439    1520     0.88    0.85  0.97    1.30
+fixed  4  2048  508  attn flex       69     174     630     0.62    0.18  0.29    0.38
+fixed  4  2048  508 layer flex      543    1448    1918     0.87    0.67  0.77    1.04
+fixed  4  2048  508  attn best       29     146     217     0.86    0.53  0.61    0.80
+fixed  4  2048  508 layer best      532    1441    1535     0.88    0.84  0.95    1.28
+fixed  4  2048 1020  gemm    -      488    2516    2594     0.92    0.91  0.98    1.16
+fixed  4  2048 1020  attn   fa       62     336     398     0.73    0.64  0.88    1.00
+fixed  4  2048 1020 layer   fa      544    2877    2954     0.89    0.88  0.99    1.16
+fixed  4  2048 1020  attn flex       71     375     883     0.65    0.29  0.44    0.50
+fixed  4  2048 1020 layer flex      544    2888    3418     0.89    0.76  0.86    1.00
+fixed  4  2048 1020  attn best       29     317     390     0.84    0.65  0.78    0.89
+fixed  4  2048 1020 layer best      533    2884    2961     0.89    0.88  0.98    1.15
+fixed  4  2048 2044  gemm    -      489    5218    5227     0.90    0.90  1.00    1.09
+fixed  4  2048 2044  attn   fa       63     746     775     0.80    0.79  0.99    1.04
+fixed  4  2048 2044 layer   fa      544    5921    5988     0.89    0.89  1.00    1.08
+W1119 21:15:19.146000 2345447 torch/_dynamo/convert_frame.py:906] [0/8] torch._dynamo hit config.cache_size_limit (8)
+W1119 21:15:19.146000 2345447 torch/_dynamo/convert_frame.py:906] [0/8]    function: 'flex_attention' (/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/nn/attention/flex_attention.py:1157)
+W1119 21:15:19.146000 2345447 torch/_dynamo/convert_frame.py:906] [0/8]    last reason: 0/1: tensor 'L['key']' size mismatch at index 2. expected 2300, actual 12284
+W1119 21:15:19.146000 2345447 torch/_dynamo/convert_frame.py:906] [0/8] To log all recompilation reasons, use TORCH_LOGS="recompiles".
+W1119 21:15:19.146000 2345447 torch/_dynamo/convert_frame.py:906] [0/8] To diagnose recompilation issues, see https://pytorch.org/docs/main/torch.compiler_troubleshooting.html.
+fixed  4  2048 2044  attn flex       73     823   73403     0.72    0.01  0.01    0.01
+fixed  4  2048 2044 layer flex      546    5962   78055     0.88    0.07  0.08    0.08
+fixed  4  2048 2044  attn best       29     713     768     0.87    0.80  0.91    0.97
+fixed  4  2048 2044 layer best      531    5855    5941     0.90    0.89  0.99    1.07
+fixed  4  8192  252  gemm    -      528     758     758     0.78    0.77  0.99    1.70
+fixed  4  8192  252  attn   fa      205     259     465     0.76    0.45  0.59    1.00
+fixed  4  8192  252 layer   fa      708     980    1177     0.80    0.68  0.84    1.43
+fixed  4  8192  252  attn flex     2031    6924   31845     0.04    0.01  0.17    0.28
+fixed  4  8192  252 layer flex     2477    7574   32506     0.13    0.02  0.18    0.31
+fixed  4  8192  252  attn best      160     246     450     0.87    0.46  0.53    0.90
+fixed  4  8192  252 layer best      641     952    1152     0.85    0.69  0.81    1.38
+fixed  4  8192  508  gemm    -      527    1318    1353     0.86    0.87  1.01    1.36
+fixed  4  8192  508  attn   fa      204     485     710     0.82    0.59  0.72    0.97
+fixed  4  8192  508 layer   fa      652    1756    1997     0.89    0.80  0.89    1.21
+fixed  4  8192  508  attn flex     2032   13691   62926     0.04    0.01  0.19    0.25
+fixed  4  8192  508 layer flex     2472   14833   64083     0.12    0.02  0.20    0.27
+fixed  4  8192  508  attn best      159     457     679     0.92    0.62  0.68    0.91
+fixed  4  8192  508 layer best      641    1744    1986     0.90    0.80  0.89    1.20
+fixed  4  8192 1020  gemm    -      527    2573    2617     0.89    0.90  1.01    1.18
+fixed  4  8192 1020  attn   fa      204     971    1154     0.86    0.75  0.87    1.02
+fixed  4  8192 1020 layer   fa      653    3489    3722     0.91    0.86  0.95    1.11
+fixed  4  8192 1020  attn flex     2035   28467  126052     0.03    0.01  0.21    0.24
+fixed  4  8192 1020 layer flex     2475   30674  128266     0.11    0.03  0.22    0.26
+fixed  4  8192 1020  attn best      159     931    1149     0.93    0.75  0.81    0.95
+fixed  4  8192 1020 layer best      641    3437    3720     0.93    0.86  0.93    1.10
+fixed  4  8192 2044  gemm    -      527    5260    5282     0.88    0.89  1.01    1.10
+fixed  4  8192 2044  attn   fa      205    2001    2201     0.90    0.83  0.93    1.00
+fixed  4  8192 2044 layer   fa      655    7145    7369     0.91    0.89  0.98    1.06
+fixed  4  8192 2044  attn flex  OOM, skipped
+fixed  4  8192 2044 layer flex  OOM, skipped
+fixed  4  8192 2044  attn best      160    1984    2185     0.92    0.84  0.91    0.98
+fixed  4  8192 2044 layer best      642    7171    7372     0.91    0.89  0.98    1.06
+fixed  4 16384  252  gemm    -      528     751     752     0.78    0.78  1.00    1.70
+fixed  4 16384  252  attn   fa      365     479     864     0.83    0.48  0.57    0.98
+fixed  4 16384  252 layer   fa      868    1208    1582     0.82    0.63  0.77    1.31
+fixed  4 16384  252  attn flex     3573   13455   65455     0.04    0.01  0.15    0.26
+fixed  4 16384  252 layer flex     3834   13903   66117     0.10    0.02  0.16    0.27
+fixed  4 16384  252  attn best      306     460     861     0.91    0.48  0.52    0.89
+fixed  4 16384  252 layer best      788    1159    1572     0.87    0.64  0.73    1.24
+fixed  4 16384  508  gemm    -      527    1318    1351     0.86    0.87  1.01    1.37
+fixed  4 16384  508  attn   fa      365     913    1299     0.87    0.64  0.73    0.98
+fixed  4 16384  508 layer   fa      869    2188    2620     0.89    0.76  0.86    1.17
+fixed  4 16384  508  attn flex     3366   26332  128577     0.04    0.01  0.17    0.23
+fixed  4 16384  508 layer flex     3818   27459  129744     0.09    0.02  0.18    0.24
+fixed  4 16384  508  attn best      306     868    1290     0.95    0.64  0.68    0.91
+fixed  4 16384  508 layer best      789    2167    2619     0.92    0.77  0.84    1.13
+fixed  4 16384 1020  gemm    -      527    2622    2632     0.88    0.89  1.02    1.20
+fixed  4 16384 1020  attn   fa      366    1757    2180     0.93    0.77  0.83    0.97
+fixed  4 16384 1020 layer   fa      868    4337    4754     0.91    0.85  0.93    1.09
+fixed  4 16384 1020  attn flex  OOM, skipped
+fixed  4 16384 1020 layer flex  OOM, skipped
+fixed  4 16384 1020  attn best      335    1748    2174     0.95    0.77  0.82    0.96
+fixed  4 16384 1020 layer best      857    4327    4751     0.91    0.85  0.93    1.09
+fixed  4 16384 2044  gemm    -      528    5216    5216     0.89    0.90  1.01    1.10
+fixed  4 16384 2044  attn   fa      339    3647    3988     0.94    0.87  0.92    1.00
+fixed  4 16384 2044 layer   fa      799    8803    9196     0.92    0.89  0.96    1.04
+fixed  4 16384 2044  attn flex  OOM, skipped
+fixed  4 16384 2044 layer flex  OOM, skipped
+fixed  4 16384 2044  attn best      344    3643    3987     0.94    0.87  0.92    1.00
+fixed  4 16384 2044 layer best      789    8812    9202     0.92    0.89  0.96    1.04
+fixed 16  2048  240  gemm    -      536     712     717     0.78    0.82  1.05    1.74
+fixed 16  2048  240  attn   fa      186      87     304     0.73    0.53  0.73    0.90
+fixed 16  2048  240 layer   fa      660     779     994     0.82    0.64  0.79    1.45
+fixed 16  2048  240  attn flex     2045    1759   26797     0.05    0.01  0.12    0.14
+fixed 16  2048  240 layer flex     2502    2421   27459     0.24    0.02  0.10    0.18
+fixed 16  2048  240  attn best      156      85     304     0.82    0.53  0.65    0.79
+fixed 16  2048  240 layer best      648     782     991     0.82    0.65  0.79    1.44
+fixed 16  2048  496  gemm    -      537    1310    1345     0.85    0.87  1.03    1.37
+fixed 16  2048  496  attn   fa      187     161     397     0.74    0.42  0.57    0.88
+fixed 16  2048  496 layer   fa      660    1432    1671     0.87    0.77  0.89    1.25
+fixed 16  2048  496  attn flex     2061    4095   52765     0.04    0.00  0.08    0.12
+fixed 16  2048  496 layer flex     2504    5251   53914     0.23    0.02  0.10    0.14
+fixed 16  2048  496  attn best      156     145     380     0.86    0.44  0.51    0.79
+fixed 16  2048  496 layer best      647    1427    1656     0.88    0.78  0.89    1.25
+fixed 16  2048 1008  gemm    -      536    2552    2619     0.89    0.90  1.01    1.18
+fixed 16  2048 1008  attn   fa      187     339     550     0.76    0.46  0.61    0.96
+fixed 16  2048 1008 layer   fa      660    2885    3112     0.88    0.84  0.95    1.14
+fixed 16  2048 1008  attn flex     2054    9420  105284     0.03    0.00  0.07    0.11
+fixed 16  2048 1008 layer flex     2509   11634  107558     0.22    0.02  0.11    0.13
+fixed 16  2048 1008  attn best      156     315     543     0.84    0.47  0.55    0.87
+fixed 16  2048 1008 layer best      648    2882    3119     0.89    0.83  0.94    1.13
+fixed 16  2048 2032  gemm    -      537    5241    5242     0.88    0.90  1.02    1.10
+fixed 16  2048 2032  attn   fa      187     734     924     0.82    0.66  0.81    1.00
+fixed 16  2048 2032 layer   fa      660    5882    6127     0.89    0.87  0.97    1.07
+fixed 16  2048 2032  attn flex  OOM, skipped
+fixed 16  2048 2032 layer flex  OOM, skipped
+fixed 16  2048 2032  attn best      156     713     922     0.87    0.66  0.76    0.94
+fixed 16  2048 2032 layer best      649    5882    6141     0.89    0.86  0.97    1.06
+fixed 16  8192  240  gemm    -      536     758     746     0.75    0.79  1.04    1.73
+fixed 16  8192  240  attn   fa      670     259    1097     0.84    0.57  0.68    0.85
+fixed 16  8192  240 layer   fa     1182     977    1821     0.81    0.61  0.74    1.19
+fixed 16  8192  240  attn flex     6082    6603  117348     0.06    0.01  0.09    0.11
+fixed 16  8192  240 layer flex     6503    7237  117941     0.13    0.01  0.07    0.12
+fixed 16  8192  240  attn best      579     245    1068     0.95    0.59  0.62    0.77
+fixed 16  8192  240 layer best     1072     944    1785     0.87    0.62  0.71    1.13
+fixed 16  8192  496  gemm    -      536    1312    1349     0.85    0.87  1.03    1.37
+fixed 16  8192  496  attn   fa      669     485    1321     0.86    0.48  0.56    0.87
+fixed 16  8192  496 layer   fa     1182    1756    2658     0.87    0.60  0.69    1.11
+fixed 16  8192  496  attn flex  OOM, skipped
+fixed 16  8192  496 layer flex  OOM, skipped
+fixed 16  8192  496  attn best      578     456    1292     0.96    0.49  0.51    0.80
+fixed 16  8192  496 layer best     1070    1747    2640     0.91    0.60  0.66    1.07
+fixed 16  8192 1008  gemm    -      538    2532    2618     0.89    0.90  1.01    1.17
+fixed 16  8192 1008  attn   fa      669     957    1836     0.89    0.47  0.53    0.89
+fixed 16  8192 1008 layer   fa     1182    3507    4406     0.89    0.73  0.82    1.06
+fixed 16  8192 1008  attn flex  OOM, skipped
+fixed 16  8192 1008 layer flex  OOM, skipped
+fixed 16  8192 1008  attn best      637     932    1833     0.92    0.47  0.51    0.86
+fixed 16  8192 1008 layer best     1166    3502    4411     0.90    0.73  0.81    1.06
+fixed 16  8192 2032  gemm    -      536    5076    5218     0.91    0.90  0.99    1.08
+fixed 16  8192 2032  attn   fa      610    1985    2823     0.93    0.65  0.70    0.92
+fixed 16  8192 2032 layer   fa     1082    7155    8041     0.91    0.81  0.89    1.02
+fixed 16  8192 2032  attn flex  OOM, skipped
+fixed 16  8192 2032 layer flex  OOM, skipped
+fixed 16  8192 2032  attn best      637    1983    2807     0.92    0.65  0.71    0.93
+fixed 16  8192 2032 layer best     1166    7212    8024     0.89    0.81  0.91    1.04
+fixed 16 16384  240  gemm    -      537     757     721     0.75    0.81  1.08    1.79
+fixed 16 16384  240  attn   fa     1170     472    2151     0.95    0.58  0.61    0.76
+fixed 16 16384  240 layer   fa     1643    1163    2857     0.90    0.61  0.67    0.98
+fixed 16 16384  240  attn flex  OOM, skipped
+fixed 16 16384  240 layer flex  OOM, skipped
+fixed 16 16384  240  attn best     1258     460    2209     0.91    0.57  0.62    0.78
+fixed 16 16384  240 layer best     1789    1157    2848     0.86    0.61  0.70    1.03
+fixed 16 16384  496  gemm    -      536    1312    1358     0.85    0.86  1.02    1.36
+fixed 16 16384  496  attn   fa     1172     875    2607     0.97    0.48  0.50    0.79
+fixed 16 16384  496 layer   fa     1646    2156    3906     0.93    0.51  0.55    0.97
+fixed 16 16384  496  attn flex  OOM, skipped
+fixed 16 16384  496 layer flex  OOM, skipped
+fixed 16 16384  496  attn best     1258     871    2579     0.93    0.49  0.53    0.83
+fixed 16 16384  496 layer best     1788    2184    3899     0.89    0.51  0.58    1.02
+fixed 16 16384 1008  gemm    -      536    2527    2604     0.89    0.90  1.01    1.18
+fixed 16 16384 1008  attn   fa     1172    1755    3501     0.97    0.48  0.50    0.84
+fixed 16 16384 1008 layer   fa     1642    4298    6076     0.94    0.66  0.71    0.98
+fixed 16 16384 1008  attn flex  OOM, skipped
+fixed 16 16384 1008 layer flex  OOM, skipped
+fixed 16 16384 1008  attn best     1139    1746    3447     0.98    0.49  0.50    0.84
+fixed 16 16384 1008 layer best     1630    4319    6055     0.94    0.67  0.71    0.98
+fixed 16 16384 2032  gemm    -      536    5239    5225     0.88    0.90  1.02    1.11
+fixed 16 16384 2032  attn   fa     1172    3649    5371     0.96    0.65  0.67    0.90
+fixed 16 16384 2032 layer   fa     1645    8796   10630     0.93    0.77  0.83    0.98
+fixed 16 16384 2032  attn flex  OOM, skipped
+fixed 16 16384 2032 layer flex  OOM, skipped
+fixed 16 16384 2032  attn best     1144    3655    5368     0.96    0.65  0.67    0.89
+fixed 16 16384 2032 layer best     1632    8802   10566     0.93    0.77  0.83    0.99
+fixed 64  2048  192  gemm    -      586     729     746     0.68    0.79  1.15    1.76
+fixed 64  2048  192  attn   fa      674      87    1147     0.83    0.53  0.64    0.66
+fixed 64  2048  192 layer   fa     1138     757    1780     0.79    0.60  0.76    1.07
+fixed 64  2048  192  attn flex     6125    1376  111734     0.08    0.01  0.06    0.07
+fixed 64  2048  192 layer flex     6599    2043  112460     0.17    0.01  0.05    0.08
+fixed 64  2048  192  attn best      583      83    1084     0.95    0.56  0.59    0.61
+fixed 64  2048  192 layer best     1125     766    1776     0.80    0.61  0.76    1.07
+fixed 64  2048  448  gemm    -      584    1259    1361     0.79    0.86  1.09    1.35
+fixed 64  2048  448  attn   fa      674     153    1232     0.83    0.49  0.59    0.67
+fixed 64  2048  448 layer   fa     1236    1387    2557     0.82    0.50  0.61    1.03
+fixed 64  2048  448  attn flex  OOM, skipped
+fixed 64  2048  448 layer flex  OOM, skipped
+fixed 64  2048  448  attn best      583     140    1133     0.95    0.54  0.56    0.64
+fixed 64  2048  448 layer best     1126    1371    2413     0.86    0.53  0.62    1.03
+fixed 64  2048  960  gemm    -      584    2550    2595     0.84    0.91  1.08    1.21
+fixed 64  2048  960  attn   fa      675     318    1327     0.83    0.47  0.56    0.75
+fixed 64  2048  960 layer   fa     1235    2826    3840     0.85    0.68  0.79    1.06
+fixed 64  2048  960  attn flex  OOM, skipped
+fixed 64  2048  960 layer flex  OOM, skipped
+fixed 64  2048  960  attn best      641     303    1329     0.87    0.47  0.53    0.71
+fixed 64  2048  960 layer best     1221    2804    3835     0.86    0.68  0.79    1.05
+fixed 64  2048 1984  gemm    -      584    5121    5228     0.87    0.90  1.03    1.09
+fixed 64  2048 1984  attn   fa      619     707    1537     0.89    0.42  0.47    0.86
+fixed 64  2048 1984 layer   fa     1141    5779    6770     0.89    0.78  0.88    1.02
+fixed 64  2048 1984  attn flex  OOM, skipped
+fixed 64  2048 1984 layer flex  OOM, skipped
+fixed 64  2048 1984  attn best      641     690    1561     0.88    0.41  0.47    0.85
+fixed 64  2048 1984 layer best     1223    5844    6803     0.87    0.78  0.89    1.04
+fixed 64  8192  192  gemm    -      545     693     723     0.72    0.81  1.12    1.71
+fixed 64  8192  192  attn   fa     2312     251    7621     0.98    0.31  0.32    0.34
+fixed 64  8192  192 layer   fa     2830     919    7877     0.90    0.36  0.40    0.48
+fixed 64  8192  192  attn flex  OOM, skipped
+fixed 64  8192  192 layer flex  OOM, skipped
+fixed 64  8192  192  attn best     2512     217    7564     0.92    0.32  0.34    0.36
+fixed 64  8192  192 layer best     2815     904    7790     0.91    0.37  0.40    0.48
+fixed 64  8192  448  gemm    -      585    1256    1366     0.79    0.86  1.08    1.35
+fixed 64  8192  448  attn   fa     2553     457    7887     0.90    0.30  0.34    0.38
+fixed 64  8192  448 layer   fa     2833    1677    8854     0.93    0.33  0.36    0.51
+fixed 64  8192  448  attn flex  OOM, skipped
+fixed 64  8192  448 layer flex  OOM, skipped
+fixed 64  8192  448  attn best     2270     453    7718     1.00    0.31  0.31    0.35
+fixed 64  8192  448 layer best     2815    1690    8829     0.93    0.33  0.36    0.51
+fixed 64  8192  960  gemm    -      584    2507    2570     0.85    0.91  1.07    1.20
+fixed 64  8192  960  attn   fa     2313     917    8538     0.98    0.28  0.29    0.38
+fixed 64  8192  960 layer   fa     2832    3397   10879     0.93    0.30  0.32    0.57
+fixed 64  8192  960  attn flex  OOM, skipped
+fixed 64  8192  960 layer flex  OOM, skipped
+fixed 64  8192  960  attn best     2271     923    8545     0.99    0.28  0.28    0.37
+fixed 64  8192  960 layer best     2814    3409   10857     0.93    0.30  0.32    0.57
+fixed 64  8192 1984  gemm    -      547    5102    5203     0.88    0.90  1.02    1.09
+fixed 64  8192 1984  attn   fa     2315    1901    8905     0.98    0.27  0.28    0.47
+fixed 64  8192 1984 layer   fa     2831    6983   13906     0.93    0.47  0.51    0.71
+fixed 64  8192 1984  attn flex  OOM, skipped
+fixed 64  8192 1984 layer flex  OOM, skipped
+fixed 64  8192 1984  attn best     2269    1919    8922     0.99    0.27  0.28    0.47
+fixed 64  8192 1984 layer best     2814    7016   13904     0.93    0.47  0.51    0.71
+skip B=64 ctx=16384 C=192: 8.7 GB KV
+skip B=64 ctx=16384 C=448: 8.7 GB KV
+skip B=64 ctx=16384 C=960: 8.7 GB KV
+skip B=64 ctx=16384 C=1984: 8.7 GB KV
+# wrote /home/bhat/clod/thesis-exploration/bench/results/eta_NVIDIA_GeForce_RTX_4090.csv

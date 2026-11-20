@@ -1,2 +1,45 @@
 __pycache__/
 *.pyc
+
+# FPGA / Vitis / Vivado build outputs (keep sources only)
+*.bit
+*.bin
+*.xclbin
+*.xsa
+*.xo
+*.dcp
+*.elf
+*.pdi
+*.ltx
+*.jou
+*.str
+.Xil/
+_x/
+_x_*/
+*.runs/
+*.cache/
+*.hw/
+*.ip_user_files/
+*.sim/
+*.gen/
+.ipcache/
+vivado*.log
+vitis*.log
+v++*.log
+ws*/
+build/
+
+# Model weights, datasets, large data
+*.safetensors
+*.gguf
+*.pt
+*.pth
+*.npy
+*.npz
+data/
+weights/
+
+# Secrets
+.env
+*.pem
+*.key

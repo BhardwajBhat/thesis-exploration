@@ -1,2 +1,44 @@
 __pycache__/
 *.pyc
+
+# Python envs / tooling
+.venv/
+venv/
+*.egg-info/
+.ipynb_checkpoints/
+
+# Weights, datasets, large artifacts (never commit)
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.gguf
+*.onnx
+*.npy
+*.npz
+*.parquet
+*.arrow
+*.h5
+*.tar
+*.tar.gz
+*.zip
+models/
+weights/
+data/
+datasets/
+hf_cache/
+
+# Logs and run outputs (keep small CSV/JSON results in results/)
+*.log
+logs/
+wandb/
+runs/
+nohup.out
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+secrets*

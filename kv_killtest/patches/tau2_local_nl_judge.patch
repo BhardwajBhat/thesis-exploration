@@ -1,0 +1,17 @@
+diff --git a/src/tau2/config.py b/src/tau2/config.py
+index c7f2096..de9a9ed 100644
+--- a/src/tau2/config.py
++++ b/src/tau2/config.py
+@@ -48,6 +48,12 @@ DEFAULT_INTAKE_TASK_SEED = 20260824
+ 
+ DEFAULT_LLM_NL_ASSERTIONS = "gpt-5.4-mini-2026-03-17"
+ DEFAULT_LLM_NL_ASSERTIONS_ARGS = {"reasoning_effort": "low"}
++# kv_killtest: optional local judge, e.g. TAU2_NL_JUDGE=hosted_vllm/Qwen/Qwen3-8B
++# TAU2_NL_JUDGE_ARGS='{"api_base": "http://localhost:1054/v1", "temperature": 0}'
++import json as _json, os as _os
++if _os.getenv("TAU2_NL_JUDGE"):
++    DEFAULT_LLM_NL_ASSERTIONS = _os.environ["TAU2_NL_JUDGE"]
++    DEFAULT_LLM_NL_ASSERTIONS_ARGS = _json.loads(_os.getenv("TAU2_NL_JUDGE_ARGS", "{}"))
+ 
+ DEFAULT_LLM_ENV_INTERFACE = "gpt-4.1-2025-04-14"
+ DEFAULT_LLM_ENV_INTERFACE_TEMPERATURE = 0.0

@@ -1,0 +1,73 @@
+diff --git a/berkeley-function-call-leaderboard/bfcl_eval/constants/model_config.py b/berkeley-function-call-leaderboard/bfcl_eval/constants/model_config.py
+index e42fe1c..637425a 100644
+--- a/berkeley-function-call-leaderboard/bfcl_eval/constants/model_config.py
++++ b/berkeley-function-call-leaderboard/bfcl_eval/constants/model_config.py
+@@ -58,7 +58,7 @@ from bfcl_eval.model_handler.local_inference.quick_testing_oss import (
+     QuickTestingOSSHandler,
+ )
+ from bfcl_eval.model_handler.local_inference.qwen import QwenHandler
+-from bfcl_eval.model_handler.local_inference.qwen_fc import QwenFCHandler
++from bfcl_eval.model_handler.local_inference.qwen_fc import QwenFCHandler, QwenFCNoThinkHandler
+ from bfcl_eval.model_handler.local_inference.pelican_vl_fc import PelicanVLFCHandler
+ from bfcl_eval.model_handler.local_inference.nanbeige_fc import NanbeigeFCHandler
+ from bfcl_eval.model_handler.local_inference.salesforce_llama import (
+@@ -1681,6 +1681,42 @@ local_inference_model_map = {
+         is_fc_model=False,
+         underscore_to_dot=False,
+     ),
++    "Qwen/Qwen3-4B-FC": ModelConfig(
++        model_name="Qwen/Qwen3-4B",
++        display_name="Qwen3-4B (FC)",
++        url="https://huggingface.co/Qwen/Qwen3-4B",
++        org="Qwen",
++        license="apache-2.0",
++        model_handler=QwenFCHandler,
++        input_price=None,
++        output_price=None,
++        is_fc_model=True,
++        underscore_to_dot=False,
++    ),
++    "Qwen/Qwen3-4B-FC-nothink": ModelConfig(
++        model_name="Qwen/Qwen3-4B",
++        display_name="Qwen3-4B (FC, no think)",
++        url="https://huggingface.co/Qwen/Qwen3-4B",
++        org="Qwen",
++        license="apache-2.0",
++        model_handler=QwenFCNoThinkHandler,
++        input_price=None,
++        output_price=None,
++        is_fc_model=True,
++        underscore_to_dot=False,
++    ),
++    "Qwen/Qwen3-8B-FC-nothink": ModelConfig(
++        model_name="Qwen/Qwen3-8B",
++        display_name="Qwen3-8B (FC, no think)",
++        url="https://huggingface.co/Qwen/Qwen3-8B",
++        org="Qwen",
++        license="apache-2.0",
++        model_handler=QwenFCNoThinkHandler,
++        input_price=None,
++        output_price=None,
++        is_fc_model=True,
++        underscore_to_dot=False,
++    ),
+     "Qwen/Qwen3-8B-FC": ModelConfig(
+         model_name="Qwen/Qwen3-8B",
+         display_name="Qwen3-8B (FC)",
+diff --git a/berkeley-function-call-leaderboard/bfcl_eval/model_handler/local_inference/qwen_fc.py b/berkeley-function-call-leaderboard/bfcl_eval/model_handler/local_inference/qwen_fc.py
+index 0af3a28..84af330 100644
+--- a/berkeley-function-call-leaderboard/bfcl_eval/model_handler/local_inference/qwen_fc.py
++++ b/berkeley-function-call-leaderboard/bfcl_eval/model_handler/local_inference/qwen_fc.py
+@@ -304,3 +304,12 @@ class QwenFCHandler(OSSHandler):
+             except Exception as e:
+                 pass
+         return result
++
++
++class QwenFCNoThinkHandler(QwenFCHandler):
++    """Qwen3 hybrid model with thinking disabled, equivalent to the official chat
++    template's enable_thinking=False (an empty think block is prefilled)."""
++
++    @override
++    def _format_prompt(self, messages, function):
++        return super()._format_prompt(messages, function) + "<think>\n\n</think>\n\n"

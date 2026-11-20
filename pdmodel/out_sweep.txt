@@ -1,0 +1,40 @@
+Spatial gain over best(TM,FUSED) vs TPOT slack and partition granularity G (ctx=4096)
+platform                   B   G | s=1.2  s=1.5  s=2.0  s=3.0  s=5.0 
+ASIC-DynaCore-example      1   4 |   0.00   0.46   0.34   0.57   0.77
+ASIC-DynaCore-example    128   4 |   0.00   0.35   0.31   0.56   0.78
+ASIC-DynaCore-example      1  16 |   0.11   0.46   0.60   0.72   0.77
+ASIC-DynaCore-example    128  16 |   0.10   0.35   0.54   0.70   0.78
+ASIC-DynaCore-example      1  64 |   0.20   0.54   0.64   0.73   0.81
+ASIC-DynaCore-example    128  64 |   0.17   0.41   0.58   0.71   0.81
+ASIC-compute-rich          1   4 |   1.47   1.45   1.43   0.70   0.69
+ASIC-compute-rich        128   4 |   0.35   0.32   0.58   0.54   0.77
+ASIC-compute-rich          1  16 |   1.71   1.81   1.78   0.87   0.87
+ASIC-compute-rich        128  16 |   0.35   0.48   0.58   0.74   0.83
+ASIC-compute-rich          1  64 |   1.80   1.81   1.81   0.90   0.91
+ASIC-compute-rich        128  64 |   0.35   0.52   0.64   0.76   0.83
+ASIC-edge-NPU              1   4 |    inf   1.36   1.36   0.68   0.68
+ASIC-edge-NPU              8   4 |   1.41   0.69   0.69   0.69   0.70
+ASIC-edge-NPU              1  16 |    inf   1.70   1.70   0.85   0.85
+ASIC-edge-NPU              8  16 |   1.77   0.86   0.86   0.87   0.88
+ASIC-edge-NPU              1  64 |    inf   1.79   1.78   0.89   0.90
+ASIC-edge-NPU              8  64 |   1.77   0.88   0.89   0.90   0.92
+VCK5000-AIE                1   4 |    inf   1.36   1.36   0.69   0.70
+VCK5000-AIE                8   4 |   1.17   0.70   0.71   0.72   0.75
+VCK5000-AIE                1  16 |    inf   1.70   1.70   0.86   0.88
+VCK5000-AIE                8  16 |   1.17   0.88   0.89   0.90   0.94
+VCK5000-AIE                1  64 |    inf   1.78   1.78   0.91   0.92
+VCK5000-AIE                8  64 |   1.17   0.92   0.93   0.95   0.99
+KV260-PL                   1   4 |   1.56   1.52   1.48   0.71   0.70
+KV260-PL                   8   4 |   0.99   1.59   0.54   0.77   0.74
+KV260-PL                   1  16 |   1.82   1.78   1.73   0.88   0.88
+KV260-PL                   8  16 |   1.73   1.79   0.68   0.77   0.80
+KV260-PL                   1  64 |   1.82   1.84   1.82   0.90   0.91
+KV260-PL                   8  64 |   1.85   1.84   0.73   0.80   0.85
+
+Two devices incl. FUSED on both (prefill tok/s), tau = 2x static-decode time
+  ASIC-DynaCore-example    B=16   ctx=2048   static=     938 spatial=    1226 TM=    1455 FUSED=    1703
+  ASIC-DynaCore-example    B=64   ctx=16384  static=     610 spatial=     797 TM=     936 FUSED=    1092
+  ASIC-DynaCore-example    B=128  ctx=16384  static=     610 spatial=     797 TM=     934 FUSED=    1089
+  ASIC-compute-rich        B=16   ctx=2048   static=    7508 spatial=   11589 TM=       0 FUSED=   14222
+  ASIC-compute-rich        B=64   ctx=16384  static=    4881 spatial=    8115 TM=    7345 FUSED=    9524
+  ASIC-compute-rich        B=128  ctx=16384  static=    4881 spatial=    8115 TM=    7346 FUSED=    9432

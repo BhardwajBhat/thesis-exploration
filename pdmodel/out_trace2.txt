@@ -1,0 +1,44 @@
+
+=== ASIC-compute-rich, tau=19.7 ms (slack 1.5 at B=128), ctx=8192: prefill capacity normalised to STATIC-oracle; 'x' = decode SLO missed ===
+ Btot   STATIC* tok/s  k* |  STATICfix     TM  FUSED SPATIAL
+  256               0   7 |          x      x      x       x   decode-heavy
+   64           30504   5 |       0.20   0.95   1.54    1.23   prefill-heavy
+  192               0   7 |          x      x 15434a  26080a   mixed
+   32           36605   6 |       0.17   0.96   1.33    1.11   prefill-heavy
+   96           24403   4 |       0.25   0.94   1.86    1.42   mixed
+  128           18303   3 |       0.33      x   2.39    1.74   mixed
+   48           36605   6 |       0.17   0.88   1.31    1.11   prefill-heavy
+   (STATICfix uses k=1 prefill devices of 8; 'a' = absolute tok/s where static-oracle is infeasible)
+
+=== ASIC-compute-rich, tau=39.4 ms (slack 3.0 at B=128), ctx=8192: prefill capacity normalised to STATIC-oracle; 'x' = decode SLO missed ===
+ Btot   STATIC* tok/s  k* |  STATICfix     TM  FUSED SPATIAL
+  256           18303   3 |       1.00   1.16   2.39    1.74   decode-heavy
+   64           36605   6 |       0.50   1.08   1.33    1.11   prefill-heavy
+  192           24403   4 |       0.75   1.12   1.86    1.42   mixed
+   32           42706   7 |       0.43   1.00   1.16    1.02   prefill-heavy
+   96           36605   6 |       0.50   1.00   1.30    1.11   mixed
+  128           30504   5 |       0.60   1.10   1.54    1.23   mixed
+   48           42706   7 |       0.43   0.96   1.15    1.02   prefill-heavy
+   (STATICfix uses k=3 prefill devices of 8; 'a' = absolute tok/s where static-oracle is infeasible)
+
+=== ASIC-DynaCore-example, tau=61.0 ms (slack 1.5 at B=128), ctx=8192: prefill capacity normalised to STATIC-oracle; 'x' = decode SLO missed ===
+ Btot   STATIC* tok/s  k* |  STATICfix     TM  FUSED SPATIAL
+  256               0   7 |          x      x  2010a       x   decode-heavy
+   64            3813   5 |       0.20   1.09   1.37    0.95   prefill-heavy
+  192               0   7 |          x      x  3081a       x   mixed
+   32            4576   6 |       0.17   1.14   1.26    1.03   prefill-heavy
+   96            3050   4 |       0.25   1.01   1.54    0.83   mixed
+  128            1525   2 |       0.50   1.32   2.72    0.95   mixed
+   48            4576   6 |       0.17   1.02   1.20    0.87   prefill-heavy
+   (STATICfix uses k=1 prefill devices of 8; 'a' = absolute tok/s where static-oracle is infeasible)
+
+=== ASIC-DynaCore-example, tau=122.0 ms (slack 3.0 at B=128), ctx=8192: prefill capacity normalised to STATIC-oracle; 'x' = decode SLO missed ===
+ Btot   STATIC* tok/s  k* |  STATICfix     TM  FUSED SPATIAL
+  256            1525   2 |       1.00   1.35   2.74    0.95   decode-heavy
+   64            4576   6 |       0.33   1.14   1.26    1.03   prefill-heavy
+  192            3050   4 |       0.50   1.02   1.54    0.83   mixed
+   32            5338   7 |       0.29   1.08   1.13    0.95   prefill-heavy
+   96            4576   6 |       0.33   1.03   1.20    0.87   mixed
+  128            3813   5 |       0.40   1.09   1.37    0.95   mixed
+   48            5338   7 |       0.29   1.03   1.10    0.88   prefill-heavy
+   (STATICfix uses k=2 prefill devices of 8; 'a' = absolute tok/s where static-oracle is infeasible)

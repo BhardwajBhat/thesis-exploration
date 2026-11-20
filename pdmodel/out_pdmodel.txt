@@ -1,0 +1,116 @@
+platform betas (effective MAC/byte):
+  ASIC-DynaCore-example    beta=     1.8  model=8B  128x128-equivalent @500MHz, 4 TB/s (DynaCore motivating example)
+  ASIC-compute-rich        beta=    59.0  model=8B  4x128x128 @1GHz, 1 TB/s HBM (TPU-like balance)
+  ASIC-edge-NPU            beta=   213.3  model=1.7B  ~32 INT8 TOPS, LPDDR5X ~60 GB/s eff (phone-NPU-like)
+  VCK5000-AIE              beta=   644.4  model=1.7B  145 INT8 TOPS AIE, ~45 GB/s usable DDR4 (HeteroVLM measured ~40-50)
+  KV260-PL                 beta=    31.2  model=0.8B  1248 DSP x2 INT8 @300MHz, ~12 GB/s effective (from measured 4/4 decode)
+
+SINGLE DEVICE: prefill tokens/s under TPOT <= slack x decode-alone time
+platform                   B   ctx  slk   td0ms        TM     FUSED    fmt   SPATIAL f_dec   gain
+ASIC-DynaCore-example      1  2048  1.5    2.05         0       488   W8A8       223  0.75   0.46
+ASIC-DynaCore-example      1  2048  3.0    2.05       585       781   W8A8       557  0.38   0.71
+ASIC-DynaCore-example      1 16384  1.5    3.20         0       313   W8A8       145  0.75   0.46
+ASIC-DynaCore-example      1 16384  3.0    3.20       375       501   W8A8       362  0.38   0.72
+ASIC-DynaCore-example      8  2048  1.5   16.39       297       636   W8A8       223  0.75   0.35
+ASIC-DynaCore-example      8  2048  3.0   16.39       643       809   W8A8       557  0.38   0.69
+ASIC-DynaCore-example      8 16384  1.5   25.57       190       408   W8A8       145  0.75   0.36
+ASIC-DynaCore-example      8 16384  3.0   25.57       413       519   W8A8       362  0.38   0.70
+ASIC-DynaCore-example     32  2048  1.5   65.57       318       647   W8A8       223  0.75   0.34
+ASIC-DynaCore-example     32  2048  3.0   65.57       648       810   W8A8       557  0.38   0.69
+ASIC-DynaCore-example     32 16384  1.5  102.27       204       415   W8A8       145  0.75   0.35
+ASIC-DynaCore-example     32 16384  3.0  102.27       416       520   W8A8       362  0.38   0.70
+ASIC-DynaCore-example    128  2048  1.5  262.29       323       647   W8A8       223  0.75   0.34
+ASIC-DynaCore-example    128  2048  3.0  262.29       644       803   W8A8       557  0.38   0.69
+ASIC-DynaCore-example    128 16384  1.5  409.09       207       416   W8A8       145  0.75   0.35
+ASIC-DynaCore-example    128 16384  3.0  409.09       414       517   W8A8       362  0.38   0.70
+ASIC-compute-rich          1  2048  1.5    3.63         0      3717  W4A16      6686  0.06   1.80
+ASIC-compute-rich          1  2048  3.0    3.63      5181      7703   W8A8      6686  0.06   0.87
+ASIC-compute-rich          1 16384  1.5    4.68         0      2355  W4A16      4347  0.06   1.85
+ASIC-compute-rich          1 16384  3.0    4.68      3314      4930   W8A8      4347  0.06   0.88
+ASIC-compute-rich          8  2048  1.5    4.68         0      2747  W4A16      4903  0.31   1.79
+ASIC-compute-rich          8  2048  3.0    4.68      5196      7222   W8A8      5795  0.19   0.80
+ASIC-compute-rich          8 16384  1.5   13.14         0      4593   W8A8      3767  0.19   0.82
+ASIC-compute-rich          8 16384  3.0   13.14      3329      4791   W8A8      4057  0.12   0.85
+ASIC-compute-rich         32  2048  1.5    8.31         0      5228   W8A8      1783  0.75   0.34
+ASIC-compute-rich         32  2048  3.0    8.31      5186      6503   W8A8      4458  0.38   0.69
+ASIC-compute-rich         32 16384  1.5   42.13      1663      4483   W8A8      3478  0.25   0.78
+ASIC-compute-rich         32 16384  3.0   42.13      3318      4718   W8A8      4057  0.12   0.86
+ASIC-compute-rich        128  2048  1.5   32.79      2587      5175   W8A8      1783  0.75   0.34
+ASIC-compute-rich        128  2048  3.0   32.79      5151      6427   W8A8      4458  0.38   0.69
+ASIC-compute-rich        128 16384  1.5  158.10      1658      4409   W8A8      3478  0.25   0.79
+ASIC-compute-rich        128 16384  3.0  158.10      3273      4610   W8A8      4057  0.12   0.88
+ASIC-edge-NPU              1  2048  1.5   13.71         0      3831  W4A16      6468  0.06   1.69
+ASIC-edge-NPU              1  2048  3.0   13.71      5143      7673   W8A8      6469  0.06   0.84
+ASIC-edge-NPU              1 16384  1.5   27.41         0         0      -      3346  0.06    inf
+ASIC-edge-NPU              1 16384  3.0   27.41      2583      3858   W8A8      3347  0.06   0.87
+ASIC-edge-NPU              2  2048  1.5   15.67         0      3794  W4A16      6468  0.06   1.70
+ASIC-edge-NPU              2  2048  3.0   15.67      5139      7643   W8A8      6469  0.06   0.85
+ASIC-edge-NPU              2 16384  1.5   43.07         0      1911  W4A16      3347  0.06   1.75
+ASIC-edge-NPU              2 16384  3.0   43.07      2579      3843   W8A8      3347  0.06   0.87
+ASIC-edge-NPU              4  2048  1.5   19.58         0      3739  W4A16      6469  0.06   1.73
+ASIC-edge-NPU              4  2048  3.0   19.58      5130      7595   W8A8      6469  0.06   0.85
+ASIC-edge-NPU              4 16384  1.5   74.39         0      3827   W8A8      3347  0.06   0.87
+ASIC-edge-NPU              4 16384  3.0   74.39      2568      3817   W8A8      3347  0.06   0.88
+ASIC-edge-NPU              8  2048  1.5   27.42         0      3677  W4A16      6469  0.06   1.76
+ASIC-edge-NPU              8  2048  3.0   27.42      5111      7522   W8A8      6469  0.06   0.86
+ASIC-edge-NPU              8 16384  1.5  137.03      1290      3801   W8A8      3347  0.06   0.88
+ASIC-edge-NPU              8 16384  3.0  137.03      2548      3770   W8A8      3347  0.06   0.89
+VCK5000-AIE                1  2048  1.5   18.28         0      8706  W4A16     13674  0.12   1.57
+VCK5000-AIE                1  2048  3.0   18.28     11493     17056   W8A8     13676  0.12   0.80
+VCK5000-AIE                1 16384  1.5   36.55         0         0      -      7075  0.12    inf
+VCK5000-AIE                1 16384  3.0   36.55      5811      8665   W8A8      7076  0.12   0.82
+VCK5000-AIE                2  2048  1.5   20.89         0      8669  W4A16     13674  0.12   1.58
+VCK5000-AIE                2  2048  3.0   20.89     11460     16970   W8A8     13677  0.12   0.81
+VCK5000-AIE                2 16384  1.5   57.43         0      4357  W4A16      7076  0.12   1.62
+VCK5000-AIE                2 16384  3.0   57.43      5776      8584   W8A8      7076  0.12   0.82
+VCK5000-AIE                4  2048  1.5   26.11         0      8612  W4A16     13675  0.12   1.59
+VCK5000-AIE                4  2048  3.0   26.11     11392     16808   W8A8     13677  0.12   0.81
+VCK5000-AIE                4 16384  1.5   99.19         0      8599   W8A8      7076  0.12   0.82
+VCK5000-AIE                4 16384  3.0   99.19      5708      8435   W8A8      7076  0.12   0.84
+VCK5000-AIE                8  2048  1.5   36.56         0      8530  W4A16     13676  0.12   1.60
+VCK5000-AIE                8  2048  3.0   36.56     11264     16515   W8A8     13677  0.12   0.83
+VCK5000-AIE                8 16384  1.5  182.70      2898      8447   W8A8      7076  0.12   0.84
+VCK5000-AIE                8 16384  3.0  182.70      5580      8165   W8A8      7076  0.12   0.87
+KV260-PL                   1  2048  1.5   33.87         0       213  W4A16       323  0.25   1.52
+KV260-PL                   1  2048  3.0   33.87       309       458   W8A8       323  0.25   0.71
+KV260-PL                   1 16384  1.5   41.21         0       146  W4A16       226  0.25   1.55
+KV260-PL                   1 16384  3.0   41.21       214       317   W8A8       226  0.25   0.72
+KV260-PL                   2  2048  1.5   36.48         0       195  W4A16       323  0.25   1.66
+KV260-PL                   2  2048  3.0   36.48       311       449   W8A8       323  0.25   0.72
+KV260-PL                   2 16384  1.5   51.16         0       135  W4A16       226  0.25   1.67
+KV260-PL                   2 16384  3.0   51.16       216       311   W8A8       226  0.25   0.73
+KV260-PL                   4  2048  1.5   41.71         0       167  W4A16       215  0.50   1.29
+KV260-PL                   4  2048  3.0   41.71       309       435   W8A8       323  0.25   0.74
+KV260-PL                   4 16384  1.5   71.07         0       124  W4A16       226  0.25   1.82
+KV260-PL                   4 16384  3.0   71.07       216       306   W8A8       226  0.25   0.74
+KV260-PL                   8  2048  1.5   52.18         0       130  W4A16       215  0.50   1.66
+KV260-PL                   8  2048  3.0   52.18       310       416   W8A8       323  0.25   0.78
+KV260-PL                   8 16384  1.5  110.90         0       277   W8A8       151  0.50   0.55
+KV260-PL                   8 16384  3.0  110.90       215       300   W8A8       226  0.25   0.75
+
+TWO DEVICES: static PD disaggregation vs dynamic spatial on both vs TM on both (prefill tok/s)
+platform                 Btot   ctx link    static     dynSP    TMboth   TPOT0 st/dyn ms
+ASIC-DynaCore-example      16  2048   16       938      1226      1455    32.79/16.39   
+ASIC-DynaCore-example      16  2048   64       938      1226      1455    32.79/16.39   
+ASIC-DynaCore-example      16 16384   16       610       797       933    51.14/25.57   
+ASIC-DynaCore-example      16 16384   64       610       797       933    51.14/25.57   
+ASIC-DynaCore-example      64  2048   16       938      1226      1458   131.15/65.57   
+ASIC-DynaCore-example      64  2048   64       938      1226      1458   131.15/65.57   
+ASIC-DynaCore-example      64 16384   16       610       797       936   204.55/102.27  
+ASIC-DynaCore-example      64 16384   64       610       797       936   204.55/102.27  
+ASIC-DynaCore-example     128  2048   16       938      1226      1453   262.29/131.15  
+ASIC-DynaCore-example     128  2048   64       938      1226      1453   262.29/131.15  
+ASIC-DynaCore-example     128 16384   16       610       797       934   409.09/204.55  
+ASIC-DynaCore-example     128 16384   64       610       797       934   409.09/204.55  
+ASIC-compute-rich          16  2048   16      7508     11589         0     5.89/4.68    
+ASIC-compute-rich          16  2048   64      7508     11589         0     5.89/4.68    
+ASIC-compute-rich          16 16384   16      4881      8115      7110    22.80/13.14   
+ASIC-compute-rich          16 16384   64      4881      8115      7110    22.80/13.14   
+ASIC-compute-rich          64  2048   16      7508      9807     11608    16.39/8.31    
+ASIC-compute-rich          64  2048   64      7508      9807     11608    16.39/8.31    
+ASIC-compute-rich          64 16384   16      4881      8115      7345    80.79/42.13   
+ASIC-compute-rich          64 16384   64      4881      8115      7345    80.79/42.13   
+ASIC-compute-rich         128  2048   16      7508      9807     11624    32.79/16.39   
+ASIC-compute-rich         128  2048   64      7508      9807     11624    32.79/16.39   
+ASIC-compute-rich         128 16384   16      4881      8115      7346   158.10/80.79   
+ASIC-compute-rich         128 16384   64      4881      8115      7346   158.10/80.79   

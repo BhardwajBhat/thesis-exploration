@@ -158,7 +158,9 @@ def main():
     a = ap.parse_args()
     global KINDS
     KINDS = [k for k in a.kinds.split(",") if k != "fa" or flash_attn_varlen_func is not None]
-    if "fa" in a.kinds and flash_attn_varlen_func is None: print("# flash_attn not installed: skipping kind=fa")
+    if flash_attn_varlen_func is None:   # "best" mixes with FA varlen, so it needs FA too
+        KINDS = [k for k in KINDS if k != "best"]
+        print("# flash_attn not installed: skipping kind=fa and kind=best (flex only)")
     ints = lambda s: [int(x) for x in s.split(",")]
     name = torch.cuda.get_device_name(0).replace(" ", "_")
     out = a.out or os.path.join(os.path.dirname(__file__), "results", f"eta_{name}.csv")

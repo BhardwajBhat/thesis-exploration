@@ -37,6 +37,11 @@ HID, H, KVH, HD, FFN = 4096, 32, 8, 128, 12288     # Qwen3-8B layer
 DT = torch.bfloat16
 BYTES = 2
 dev = "cuda"
+# Every (B, ctx, C) shape is a fresh static compile; the default limit (8) is hit
+# early in the sweep and dynamo then silently falls back to eager flex (~100x slower).
+torch._dynamo.config.cache_size_limit = 1024
+if hasattr(torch._dynamo.config, "recompile_limit"):
+    torch._dynamo.config.recompile_limit = 1024
 flex = torch.compile(flex_attention, dynamic=False)
 
 # ---------------- timing ----------------

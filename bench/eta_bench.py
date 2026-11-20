@@ -198,7 +198,12 @@ def main():
                                   (gd[0] + attd[0], gd[1] + attd[1]), (gp[0] + attp[0], gp[1] + attp[1]), (gm[0] + attm[0], gm[1] + attm[1]))
         for key, (fd, fp, fm, cd, cp, cm) in r.items():
             part, _, kind = key.partition("/")
-            td, tp, tm = bench(fd, a.iters), bench(fp, a.iters), bench(fm, a.iters)
+            try:
+                td, tp, tm = bench(fd, a.iters), bench(fp, a.iters), bench(fm, a.iters)
+            except torch.OutOfMemoryError:
+                torch.cuda.empty_cache()
+                print(f"{mode:>5}{B:>3}{ctx:>6}{C:>5} {part:>5} {(kind or '-'):>4}  OOM, skipped", flush=True)
+                continue
             rd, rp, rm = roof(*cd), roof(*cp), roof(*cm)
             eff_sep, eff_mix = (rd + rp) / (td + tp), rm / tm
             row = dict(device=name, mode=mode, B=B, ctx=ctx, C=C, part=part, kind=kind or "-",

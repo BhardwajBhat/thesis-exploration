@@ -1,0 +1,152 @@
+# device NVIDIA GeForce RTX 4090  torch 2.6.0+cu124  calibrated BF16 168.3 TFLOPS, copy BW 914 GB/s, beta=92 MAC/B
+ mode  B   ctx    C  part kind    t_dec   t_pre   t_mix  eff_sep eff_mix   eta sep/mix
+fixed  1  2048  255  gemm    -      463     739     712     0.84    0.82  0.98    1.69
+fixed  1  2048  255  attn   fa       55      90     145     0.44    0.37  0.86    1.00
+fixed  1  2048  255 layer   fa      475     785     832     0.85    0.77  0.91    1.51
+fixed  1  2048  255  attn flex       66     159     305     0.28    0.18  0.63    0.74
+fixed  1  2048  255 layer flex      486     884    1017     0.78    0.63  0.81    1.35
+fixed  1  2048  255  attn best       18      91     150     0.58    0.36  0.63    0.73
+fixed  1  2048  255 layer best      474     814     863     0.83    0.74  0.89    1.49
+fixed  1  2048  511  gemm    -      462    1363    1326     0.87    0.89  1.01    1.38
+fixed  1  2048  511  attn   fa       52     161     211     0.58    0.54  0.94    1.01
+fixed  1  2048  511 layer   fa      476    1445    1514     0.89    0.85  0.95    1.27
+fixed  1  2048  511  attn flex       66     174     291     0.52    0.39  0.76    0.82
+fixed  1  2048  511 layer flex      485    1456    1594     0.88    0.81  0.91    1.22
+fixed  1  2048  511  attn best       18     148     210     0.74    0.55  0.74    0.79
+fixed  1  2048  511 layer best      472    1441    1492     0.90    0.86  0.96    1.28
+fixed  1  2048 1023  gemm    -      461    2553    2593     0.92    0.91  0.99    1.16
+fixed  1  2048 1023  attn   fa       52     337     361     0.68    0.71  1.04    1.08
+fixed  1  2048 1023 layer   fa      476    2836    2919     0.92    0.89  0.97    1.13
+fixed  1  2048 1023  attn flex       66     376     546     0.60    0.47  0.78    0.81
+fixed  1  2048 1023 layer flex      484    2905    3078     0.89    0.85  0.95    1.10
+fixed  1  2048 1023  attn best       18     321     358     0.78    0.71  0.92    0.95
+fixed  1  2048 1023 layer best      473    2877    2919     0.91    0.89  0.99    1.15
+fixed  1  2048 2047  gemm    -      461    5209    5206     0.90    0.90  1.00    1.09
+fixed  1  2048 2047  attn   fa       53     743     733     0.78    0.84  1.07    1.09
+fixed  1  2048 2047 layer   fa      475    5915    5940     0.90    0.89  1.00    1.08
+W1119 21:13:46.071000 2344730 torch/_dynamo/convert_frame.py:906] [0/8] torch._dynamo hit config.cache_size_limit (8)
+W1119 21:13:46.071000 2344730 torch/_dynamo/convert_frame.py:906] [0/8]    function: 'flex_attention' (/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/nn/attention/flex_attention.py:1157)
+W1119 21:13:46.071000 2344730 torch/_dynamo/convert_frame.py:906] [0/8]    last reason: 0/1: tensor 'L['key']' size mismatch at index 2. expected 2303, actual 6143
+W1119 21:13:46.071000 2344730 torch/_dynamo/convert_frame.py:906] [0/8] To log all recompilation reasons, use TORCH_LOGS="recompiles".
+W1119 21:13:46.071000 2344730 torch/_dynamo/convert_frame.py:906] [0/8] To diagnose recompilation issues, see https://pytorch.org/docs/main/torch.compiler_troubleshooting.html.
+fixed  1  2048 2047  attn flex       67     822   37820     0.70    0.02  0.02    0.02
+fixed  1  2048 2047 layer flex      487    5958   42478     0.89    0.12  0.14    0.15
+fixed  1  2048 2047  attn best       17     713     728     0.85    0.84  0.99    1.00
+fixed  1  2048 2047 layer best      471    5899    5914     0.90    0.90  1.00    1.08
+fixed  1  8192  255  gemm    -      505     747     750     0.80    0.78  0.97    1.67
+fixed  1  8192  255  attn   fa       53     256     459     0.79    0.45  0.58    0.67
+fixed  1  8192  255 layer   fa      515     952    1155     0.85    0.69  0.81    1.27
+fixed  1  8192  255  attn flex     1085    7203   13713     0.03    0.02  0.52    0.60
+fixed  1  8192  255 layer flex     1515    7852   14366     0.13    0.06  0.41    0.65
+fixed  1  8192  255  attn best       32     246     448     0.88    0.46  0.53    0.62
+fixed  1  8192  255 layer best      486     947    1152     0.87    0.69  0.79    1.24
+fixed  1  8192  511  gemm    -      506    1310    1344     0.88    0.87  0.99    1.35
+fixed  1  8192  511  attn   fa       55     482     687     0.85    0.61  0.72    0.78
+fixed  1  8192  511 layer   fa      489    1752    1978     0.92    0.81  0.88    1.13
+fixed  1  8192  511  attn flex     1083   14119   26700     0.03    0.02  0.52    0.57
+fixed  1  8192  511 layer flex     1518   15275   27839     0.12    0.06  0.47    0.60
+fixed  1  8192  511  attn best       32     456     663     0.94    0.64  0.68    0.74
+fixed  1  8192  511 layer best      486    1753    1967     0.92    0.81  0.89    1.14
+fixed  1  8192 1023  gemm    -      505    2532    2598     0.91    0.90  0.99    1.17
+fixed  1  8192 1023  attn   fa       55     973    1119     0.88    0.78  0.88    0.92
+fixed  1  8192 1023 layer   fa      489    3489    3673     0.92    0.88  0.95    1.08
+fixed  1  8192 1023  attn flex     1084   28826   53297     0.03    0.02  0.54    0.56
+fixed  1  8192 1023 layer flex     1538   31046   55532     0.11    0.06  0.51    0.59
+fixed  1  8192 1023  attn best       32     927    1111     0.94    0.78  0.83    0.86
+fixed  1  8192 1023 layer best      486    3498    3688     0.92    0.87  0.95    1.08
+fixed  1  8192 2047  gemm    -      505    5261    5229     0.89    0.90  1.01    1.10
+fixed  1  8192 2047  attn   fa       55    2006    2085     0.91    0.88  0.97    0.99
+fixed  1  8192 2047 layer   fa      489    7151    7245     0.91    0.90  0.99    1.05
+fixed  1  8192 2047  attn flex     1073   64022  111872     0.03    0.02  0.57    0.58
+fixed  1  8192 2047 layer flex     1529   68731  116529     0.10    0.06  0.56    0.60
+fixed  1  8192 2047  attn best       32    1978    2086     0.93    0.88  0.94    0.96
+fixed  1  8192 2047 layer best      487    7168    7253     0.91    0.90  0.99    1.06
+fixed  1 16384  255  gemm    -      505     749     752     0.80    0.78  0.97    1.67
+fixed  1 16384  255  attn   fa       69     476     865     0.89    0.48  0.54    0.63
+fixed  1 16384  255 layer   fa      550    1199    1586     0.85    0.63  0.74    1.10
+fixed  1 16384  255  attn flex     1392   13902   26964     0.03    0.02  0.48    0.57
+fixed  1 16384  255 layer flex     1785   14562   27612     0.09    0.04  0.40    0.59
+fixed  1 16384  255  attn best       45     464     858     0.95    0.48  0.51    0.59
+fixed  1 16384  255 layer best      502    1157    1552     0.90    0.64  0.72    1.07
+fixed  1 16384  511  gemm    -      505    1327    1343     0.87    0.87  1.00    1.36
+fixed  1 16384  511  attn   fa       69     907    1284     0.92    0.65  0.70    0.76
+fixed  1 16384  511 layer   fa      504    2175    2586     0.93    0.77  0.83    1.04
+fixed  1 16384  511  attn flex     1357   27171   52602     0.03    0.02  0.50    0.54
+fixed  1 16384  511 layer flex     1782   28340   53798     0.08    0.04  0.45    0.56
+fixed  1 16384  511  attn best       45     869    1276     0.99    0.65  0.66    0.72
+fixed  1 16384  511 layer best      502    2195    2573     0.93    0.78  0.84    1.05
+fixed  1 16384 1023  gemm    -      506    2601    2621     0.89    0.90  1.01    1.19
+fixed  1 16384 1023  attn   fa       69    1772    2131     0.95    0.79  0.83    0.86
+fixed  1 16384 1023 layer   fa      504    4315    4654     0.94    0.87  0.92    1.04
+fixed  1 16384 1023  attn flex     1366   54899  103242     0.03    0.02  0.52    0.54
+fixed  1 16384 1023 layer flex     1783   57132  105483     0.08    0.04  0.50    0.56
+fixed  1 16384 1023  attn best       45    1750    2120     0.98    0.79  0.81    0.85
+fixed  1 16384 1023 layer best      502    4333    4660     0.94    0.87  0.92    1.04
+fixed  1 16384 2047  gemm    -      506    5272    5285     0.89    0.89  1.00    1.09
+fixed  1 16384 2047  attn   fa       69    3664    3893     0.95    0.89  0.94    0.96
+fixed  1 16384 2047 layer   fa      505    8789    9037     0.93    0.90  0.97    1.03
+Traceback (most recent call last):
+  File "/home/bhat/clod/thesis-exploration/bench/eta_bench.py", line 213, in <module>
+    
+  File "/home/bhat/clod/thesis-exploration/bench/eta_bench.py", line 199, in main
+    for key, (fd, fp, fm, cd, cp, cm) in r.items():
+  File "/home/bhat/clod/thesis-exploration/bench/eta_bench.py", line 44, in bench
+    for _ in range(warmup): fn()
+  File "/home/bhat/clod/thesis-exploration/bench/eta_bench.py", line 192, in <lambda>
+    lambda: (L.pre_attn(xm), L.post_attn(xm, am)), gd, gp, gm)
+  File "/home/bhat/clod/thesis-exploration/bench/eta_bench.py", line 148, in attn_mix
+    return flex(d["qm"], d["km"], d["vm"], block_mask=d["bm_mix"], enable_gqa=True)
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 574, in _fn
+    return fn(*args, **kwargs)
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/nn/attention/flex_attention.py", line 1353, in flex_attention
+    out, lse = torch.compile(
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 574, in _fn
+    return fn(*args, **kwargs)
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/nn/attention/flex_attention.py", line 1340, in _flex_attention_hop_wrapper
+    def _flex_attention_hop_wrapper(*args, **kwargs):
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 745, in _fn
+    return fn(*args, **kwargs)
+  File "<eval_with_key>.147", line 22, in forward
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_higher_order_ops/flex_attention.py", line 90, in __call__
+    return super().__call__(
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_ops.py", line 440, in __call__
+    return wrapper()
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 745, in _fn
+    return fn(*args, **kwargs)
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_ops.py", line 436, in wrapper
+    return self.dispatch(
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_ops.py", line 302, in dispatch
+    return kernel(*args, **kwargs)
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_higher_order_ops/flex_attention.py", line 731, in flex_attention_autograd
+    out, logsumexp = FlexAttentionAutogradOp.apply(
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/autograd/function.py", line 575, in apply
+    return super().apply(*args, **kwargs)  # type: ignore[misc]
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_higher_order_ops/flex_attention.py", line 597, in forward
+    out, logsumexp = flex_attention(
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_higher_order_ops/flex_attention.py", line 90, in __call__
+    return super().__call__(
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_ops.py", line 440, in __call__
+    return wrapper()
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 745, in _fn
+    return fn(*args, **kwargs)
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_ops.py", line 431, in wrapper
+    return torch.overrides.handle_torch_function(
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/overrides.py", line 1720, in handle_torch_function
+    result = mode.__torch_function__(public_api, types, args, kwargs)
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_dynamo/_trace_wrapped_higher_order_op.py", line 142, in __torch_function__
+    return func(*args, **(kwargs or {}))
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_higher_order_ops/flex_attention.py", line 90, in __call__
+    return super().__call__(
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_ops.py", line 440, in __call__
+    return wrapper()
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 745, in _fn
+    return fn(*args, **kwargs)
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_ops.py", line 436, in wrapper
+    return self.dispatch(
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_ops.py", line 302, in dispatch
+    return kernel(*args, **kwargs)
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_higher_order_ops/flex_attention.py", line 264, in sdpa_dense
+    out, lse = math_attention(
+  File "/home/bhat/clod/thesis-exploration/.venv/lib/python3.10/site-packages/torch/_higher_order_ops/flex_attention.py", line 243, in math_attention
+    logsumexp = post_mod_scores.logsumexp(dim=-1)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.50 GiB. GPU 0 has a total capacity of 23.64 GiB of which 4.74 GiB is free. Including non-PyTorch memory, this process has 18.90 GiB memory in use. Of the allocated memory 18.41 GiB is allocated by PyTorch, and 36.94 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)

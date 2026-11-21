@@ -3,7 +3,7 @@
 # bf16 is run twice (seed 0 and 1) to measure run-to-run noise.
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")/.." && pwd)
-export CATEGORIES=multi_turn_base,multi_turn_long_context,memory_kv THREADS=32 GPU_UTIL=0.45
+export CATEGORIES=multi_turn_base,multi_turn_long_context,memory_kv THREADS=32 GPU_UTIL=0.8
 for M in 8B 4B; do
   for cfg in "auto 0 bf16_s0" "nvfp4 0 nvfp4_s0" "fp8 0 fp8_s0" "auto 1 bf16_s1"; do
     set -- $cfg

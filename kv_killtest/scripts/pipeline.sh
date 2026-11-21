@@ -15,7 +15,7 @@ mkdir -p results
 if [[ ! -s results/decode_speed.csv ]]; then
   for kv in auto fp8 nvfp4; do
     .venv/bin/python scripts/decode_speed.py Qwen/Qwen3-8B $kv results/decode_speed.csv \
-      8192,32768,131072 > runs/speed_$kv.log 2>&1 || log "SPEED $kv FAILED"
+      8192,32768,130000 > runs/speed_$kv.log 2>&1 || log "SPEED $kv FAILED"
   done
 fi
 log "SPEED done"

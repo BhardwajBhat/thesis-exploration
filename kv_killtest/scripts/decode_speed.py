@@ -14,13 +14,13 @@ from vllm import LLM, SamplingParams
 from vllm.inputs import TokensPrompt
 
 model, kv, out = sys.argv[1], sys.argv[2], sys.argv[3]
-ctxs = [int(c) for c in (sys.argv[4] if len(sys.argv) > 4 else "8192,32768,131072").split(",")]
+ctxs = [int(c) for c in (sys.argv[4] if len(sys.argv) > 4 else "8192,32768,130000").split(",")]
 N, REPS = 256, 3
 llm = LLM(model=model, dtype="bfloat16", kv_cache_dtype=kv, seed=0,
-          max_model_len=max(ctxs) + N + 64, enable_prefix_caching=False,
+          max_model_len=min(max(ctxs) + N + 64, 131072), enable_prefix_caching=False,
           gpu_memory_utilization=0.6, max_num_seqs=1,
-          hf_overrides={"rope_scaling": {"rope_type": "yarn", "factor": 4.0,
-                                         "original_max_position_embeddings": 32768},
+          hf_overrides={"rope_parameters": {"rope_type": "yarn", "factor": 4.0, "rope_theta": 1000000,
+                                            "original_max_position_embeddings": 32768},
                         "max_position_embeddings": 131072})
 kv_tokens = llm.llm_engine.vllm_config.cache_config.num_gpu_blocks * \
             llm.llm_engine.vllm_config.cache_config.block_size

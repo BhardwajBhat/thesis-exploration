@@ -21,8 +21,9 @@ for run in sorted(glob.glob(os.path.join(RUNS, "bfcl_*"))):
     m = re.match(r"bfcl_(\w+?)_(\w+_s\d)$", os.path.basename(run))
     if not m: continue
     model, cfg = m.groups()
-    for res in glob.glob(os.path.join(run, "result", "*", "*", "*_result.json")):
+    for res in glob.glob(os.path.join(run, "result", "**", "*_result.json"), recursive=True):
         cat = re.search(r"BFCL_v4_(.+)_result\.json", res).group(1)
+        if cat.endswith("_prereq"): continue
         ids = [json.loads(l)["id"] for l in open(res)]
         sc = res.replace("/result/", "/score/").replace("_result.json", "_score.json")
         if not os.path.exists(sc): continue
@@ -40,13 +41,17 @@ for res in glob.glob(os.path.join(TAU2_SIMS, "kvkill_tau2_*", "results.json")):
     if not m: continue
     model, cfg, domain = m.groups()
     for s in json.load(open(res))["simulations"]:
+        if s.get("termination_reason") == "infrastructure_error":
+            continue  # server crash, not a model outcome; counted separately in the report
         ri = s.get("reward_info") or {}
         db = (ri.get("db_check") or {}).get("db_match")
+        if len(s.get("messages") or []) > 121:  # uniform 120-step cap (see run_tau2.sh)
+            ri, db = {"reward": 0.0}, False
         rows.append(dict(bench=f"tau2_{domain}", model=model, cfg=cfg, item=str(s["task_id"]),
                          score=float(ri.get("reward") or 0.0), err=s.get("termination_reason", "")))
-        if db is not None:
-            rows.append(dict(bench=f"tau2_{domain}_dbonly", model=model, cfg=cfg, item=str(s["task_id"]),
-                             score=1.0 if db else 0.0, err=""))
+        # DB-only score: final DB state matches; missing db_check (e.g. max_steps, too_many_errors) = 0
+        rows.append(dict(bench=f"tau2_{domain}_dbonly", model=model, cfg=cfg, item=str(s["task_id"]),
+                         score=1.0 if db else 0.0, err=""))
 
 with open(os.path.join(OUT, "per_item.csv"), "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=["bench", "model", "cfg", "item", "score", "err"]); w.writeheader(); w.writerows(rows)
@@ -90,10 +95,18 @@ for (b, m), cfgs in sorted(groups.items()):
                        diff_ci_lo=round(100 * dlo, 2), diff_ci_hi=round(100 * dhi, 2),
                        flips_up=sum(d[i] > base[i] for i in common),
                        flips_down=sum(d[i] < base[i] for i in common))
+        # Second reference: bf16_s1. For tau2 it is the setting-matched baseline (same
+        # --no-async-scheduling and --max-steps 120 as fp8/nvfp4; bf16_s0 predates both).
+        b1 = cfgs.get("bf16_s1")
+        if b1 and c not in ("bf16_s0", "bf16_s1"):
+            common = sorted(set(d) & set(b1))
+            dm, dlo, dhi = paired_boot([d[i] for i in common], [b1[i] for i in common])
+            row.update(diff_vs_bf16_s1=round(100 * dm, 2), diff1_ci_lo=round(100 * dlo, 2),
+                       diff1_ci_hi=round(100 * dhi, 2))
         summary.append(row)
 
 keys = ["bench", "model", "cfg", "n", "acc", "ci_lo", "ci_hi", "n_paired", "diff_vs_bf16_s0",
-        "diff_ci_lo", "diff_ci_hi", "flips_up", "flips_down"]
+        "diff_ci_lo", "diff_ci_hi", "flips_up", "flips_down", "diff_vs_bf16_s1", "diff1_ci_lo", "diff1_ci_hi"]
 with open(os.path.join(OUT, "summary.csv"), "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=keys); w.writeheader(); w.writerows(summary)
 json.dump(summary, open(os.path.join(OUT, "summary.json"), "w"), indent=1)
@@ -111,4 +124,5 @@ for s in summary:
     extra = (f"  diff {s['diff_vs_bf16_s0']:+.1f} [{s['diff_ci_lo']:+.1f},{s['diff_ci_hi']:+.1f}] "
              f"flips +{s['flips_up']}/-{s['flips_down']}") if "diff_vs_bf16_s0" in s else ""
     print(f"{s['bench']:32s} {s['model']:3s} {s['cfg']:9s} n={s['n']:4d} acc {s['acc']:5.1f} "
-          f"[{s['ci_lo']:.1f},{s['ci_hi']:.1f}]{extra}")
+          f"[{s['ci_lo']:.1f},{s['ci_hi']:.1f}]{extra}" +
+          (f"  vs s1 {s['diff_vs_bf16_s1']:+.1f} [{s['diff1_ci_lo']:+.1f},{s['diff1_ci_hi']:+.1f}]" if "diff_vs_bf16_s1" in s else ""))

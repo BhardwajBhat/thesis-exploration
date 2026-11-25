@@ -1,5 +1,7 @@
 # Thesis exploration: handoff from the cloud session (2026-11-19)
 
+> Superseded as the entry point by THESIS-STATE.md (2026-11-25); this file is the chronological log.
+
 Source: "Master's thesis topic exploration" cloud session (session_01EcQFdq7KLqJZcGc3DkVRKG), handoff part 1/2.
 Part 2 (analytical-model code) goes in `pdmodel/`.
 

@@ -144,3 +144,14 @@ SinkState (2611.14246), Mutable Inference (2611.18523).
 2. In parallel, cheap checks to keep options open: A's oracle-speculator bound on yellowstone; N's Moshi frame-time on the Spark.
 3. Ask the advisor: (a) is any labmate on hybrid/DeltaNet state or VLA-on-Versal (overlap with Chimera/HeteroVLM)? (b) VCK5000 availability for M.
 4. Before committing to any topic, re-run a verified novelty search (arXiv moves weekly in this area).
+
+## 9. Deep-search follow-up and software kill tests (2026-11-25)
+
+A new broad search proposed grammar-aware FPGA output heads, visual-delta GUI front ends, static-NPU agent re-arrival support, and hardware action monitors. Software tests are in `structured_head/` and `idea_killtests/`.
+
+- **Grammar-aware sparse output head: killed.** Exact XGrammar masks over 15 BFCL/tau2-shaped schemas (500 token boundaries) require 45.45% of rows on average at 64-row granularity; the optimistic KV260 projection is only 1.135x, below the 1.15x threshold, before sparse-DDR overhead. At 50% structured tokens, task speedup is 1.063x.
+- **Fused grammar filter + existing full head: killed as a performance thesis.** XGrammar mask generation averages 12.2 us versus 58 ms/token; eliminating it entirely gives 1.00021x.
+- **Visual-delta GUI front end: killed.** On 176 transitions from 20 real GUI-CC trajectories, 64.9% of patches change on average, median 84.4%, p90 100%. Headroom is irregular and GUI-KV already covers spatiotemporal reuse.
+- **Static-NPU agent re-arrival: killed for novelty.** Escapement already validates bucket alignment, KV survival cliffs, prefill interference, and compile-time configuration selection on Rebellions CA25; reported tuning gain is 9.72%.
+- **Grammar-only hardware action monitor: killed.** In 10,000 mutated robot actions, JSON Schema/type/range checks detect 50.98% of unsafe cases but miss environment-dependent hazards; contextual policy is necessary.
+- **Spark unified-memory governor remains unresolved and is still the recommended next experiment.** `idea_killtests/uma_probe.py` logs PSI, `/proc/meminfo`, cgroup accounting, process RSS/swap, and NVML data. It must be run on GB10 beside vLLM and real tool processes; a 4090 host cannot emulate the relevant unified-memory accounting/freeze behavior.

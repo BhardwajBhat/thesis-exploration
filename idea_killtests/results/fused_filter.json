@@ -1,0 +1,16 @@
+{
+  "baseline_token_us": 58000,
+  "grammar_fill_us": {
+    "mean": 12.213878,
+    "p90": 22.754900000000003,
+    "max": 59.501
+  },
+  "speedup_if_all_grammar_time_eliminated": {
+    "mean": 1.0002105841034483,
+    "p90": 1.000392325862069,
+    "max": 1.0010258793103448
+  },
+  "threshold": 1.05,
+  "verdict": "kill_as_performance_thesis",
+  "reason": "XGrammar mask generation is tens of microseconds versus a 58 ms FPGA token. A fused filter that still computes the full head cannot materially improve throughput; sparse row skipping was separately killed at 1.135x optimistic speedup."
+}

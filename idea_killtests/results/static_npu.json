@@ -1,0 +1,14 @@
+{
+  "idea": "agent re-arrival support for compile-time-static NPUs",
+  "external_artifact": "https://github.com/dongkyeomjang/escapement",
+  "artifact_test": "tests/test_descriptor_v2.py",
+  "local_result": "11 RBLN descriptor/configuration and reuse-cliff checks passed; remaining cross-branch checks unavailable in shallow clone",
+  "reported_results": {
+    "bucket_boundary_ITL_penalty_percent": [5.7, 17.8],
+    "configuration_tuning_gain_percent": 9.72,
+    "validated_reuse_cliff_background_count": 7,
+    "npu_multiturn_valid_runs": 75
+  },
+  "verdict": "kill_for_novelty",
+  "reason": "Escapement already implements and validates the proposed compile-time bucket, KV survival, re-arrival, interference, and configuration-selection study on a real Rebellions CA25 NPU. A Versal port alone would be replication rather than a thesis contribution."
+}

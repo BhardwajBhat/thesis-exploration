@@ -1,0 +1,68 @@
+{
+  "n": 10000,
+  "unsafe_n": 8876,
+  "schema_detection": 0.5098017124831005,
+  "context_policy_detection": 1.0,
+  "schema_validation_us": {
+    "mean": 25.605452399999997,
+    "p90": 28.177
+  },
+  "by_mutation": {
+    "closed_door": {
+      "n": 1059,
+      "unsafe": 1059,
+      "blocked_schema": 0,
+      "blocked_context_policy": 1059
+    },
+    "estop_violation": {
+      "n": 1112,
+      "unsafe": 1112,
+      "blocked_schema": 0,
+      "blocked_context_policy": 1112
+    },
+    "extra_field": {
+      "n": 1146,
+      "unsafe": 1146,
+      "blocked_schema": 1146,
+      "blocked_context_policy": 1146
+    },
+    "fragile_force": {
+      "n": 1102,
+      "unsafe": 1102,
+      "blocked_schema": 0,
+      "blocked_context_policy": 1102
+    },
+    "human_speed": {
+      "n": 1078,
+      "unsafe": 1078,
+      "blocked_schema": 0,
+      "blocked_context_policy": 1078
+    },
+    "malformed_type": {
+      "n": 1119,
+      "unsafe": 1119,
+      "blocked_schema": 1119,
+      "blocked_context_policy": 1119
+    },
+    "range": {
+      "n": 1120,
+      "unsafe": 1120,
+      "blocked_schema": 1120,
+      "blocked_context_policy": 1120
+    },
+    "safe": {
+      "n": 1124,
+      "unsafe": 0,
+      "blocked_schema": 0,
+      "blocked_context_policy": 0
+    },
+    "unknown_action": {
+      "n": 1140,
+      "unsafe": 1140,
+      "blocked_schema": 1140,
+      "blocked_context_policy": 1140
+    }
+  },
+  "verdict": "kill_as_grammar_only_safety_thesis",
+  "note": "Stateless schema/range enforcement cannot see environment state; contextual policy is required."
+}

@@ -154,4 +154,13 @@ A new broad search proposed grammar-aware FPGA output heads, visual-delta GUI fr
 - **Visual-delta GUI front end: killed.** On 176 transitions from 20 real GUI-CC trajectories, 64.9% of patches change on average, median 84.4%, p90 100%. Headroom is irregular and GUI-KV already covers spatiotemporal reuse.
 - **Static-NPU agent re-arrival: killed for novelty.** Escapement already validates bucket alignment, KV survival cliffs, prefill interference, and compile-time configuration selection on Rebellions CA25; reported tuning gain is 9.72%.
 - **Grammar-only hardware action monitor: killed.** In 10,000 mutated robot actions, JSON Schema/type/range checks detect 50.98% of unsafe cases but miss environment-dependent hazards; contextual policy is necessary.
-- **Spark unified-memory governor remains unresolved and is still the recommended next experiment.** `idea_killtests/uma_probe.py` logs PSI, `/proc/meminfo`, cgroup accounting, process RSS/swap, and NVML data. It must be run on GB10 beside vLLM and real tool processes; a 4090 host cannot emulate the relevant unified-memory accounting/freeze behavior.
+- **Spark unified-memory governor remains unresolved but is unavailable in practice.** `idea_killtests/uma_probe.py` is ready, but the user no longer has Spark access, so this cannot be the thesis dependency.
+
+## 10. Hardware-available shortlist kill tests (2026-11-25)
+
+After constraining the search to RTX 4090/A100 experiments, two leading candidates were tested.
+
+- **Batch-invariant/deterministic arithmetic: survives the first gate.** On Qwen3.5-0.8B BF16 on an RTX 4090, the same prompt run alone versus inside batch 4 diverged on 3/5 greedy trajectories (136/320 token positions); across batch 2/4/8, 7/15 comparisons diverged. FP32 batch 4 had 0/5 trajectory divergences and maximum selected-logit delta 2.67e-5. This establishes a real low-precision batch-invariance problem, but the current path uses Transformers reference Gated DeltaNet kernels. Next gate: production vLLM/FlashInfer kernels and measured software-determinism overhead; kill if no divergence or overhead <5%. See `determinism/`.
+- **Gated exact speculation for agentic RL: killed for the public code-RL workload.** RollPacker's 2,001 KodCode evaluator timings have median 30.8 ms, p90 78.4 ms, and a heavy p99 tail of 9.14 s. Even perfect speculation with 20 ms overhead gives only 1.051x/1.042x/1.031x aggregate speedup for a 0.5/1/2 s next LLM step; 90% gate accuracy is lower. Combined with prior math/SPORK results, do not pursue without real target traces showing much longer straggler tool gaps. See `rl_spec/`.
+
+Current recommendation: **deterministic low-precision arithmetic / selective deterministic verification**, pending the production-kernel gate.

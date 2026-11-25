@@ -19,6 +19,6 @@ FP32, batch 4:
 - 0/5 trajectories diverged
 - maximum selected-logit delta: 2.67e-5
 
-This establishes real demand for batch-invariant arithmetic in low precision on the local hardware. It does **not** yet establish a thesis contribution: this Transformers path uses reference PyTorch Gated DeltaNet kernels rather than vLLM/FlashInfer, and no deterministic-BF16 implementation or overhead measurement has been built yet.
+This reproduces the known batch-dependence problem, but follow-up literature review shows that it does **not** establish a thesis gap. vLLM and SGLang already provide batch-invariant modes; LLM-42 provides selective verified determinism; Detent reports bitwise-replayable RL rollouts and exact rollout/trainer log-probs at about 1.03x stock rollout time; CertiSum covers selective exact accumulation for MXFP4 training across vendors/layouts.
 
-Next gate: reproduce with production kernels and compare against current software batch-invariant modes. Kill if production divergence is absent or deterministic software overhead is below about 5%.
+**Final verdict: killed as the primary thesis direction.** See `BACKGROUND.md`. The local result remains useful evidence and a regression test.

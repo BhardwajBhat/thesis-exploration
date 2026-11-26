@@ -63,8 +63,11 @@ Same protocol as above (4,096 predictions, 8 x 512 windows). Selected
 and the **input activation on every call**. Modes: `bf16`, `a8_int8`,
 `w8a8_int8`, `w8a8_fp8`, `w4a4_mxfp4`, `w4a4_nvfp4`, `w4_nf4_g64`,
 `mixed_nvfp4_fp8gdn` (NVFP4 everywhere except GDN `linear_attn.*` = FP8), `w4a4_m2xfp` (M²XFP: MXES weights / MXEM activations, group 32, subgroup 8, 4.5 bit).
+Weight-only LUT/codebook modes (`w3_nf3_g64`, `w4_fp4_g32/g64`, `w4_af4_g64`, `w4_bof4_g64`,
+`w4_bof4s_g64`, `w4_apot4_g64`, `w4_lut4_*`) are described below (`--modes lut`).
 Options: `--exclude-gdn`, `--include-lm-head`, `--compute-dtype {bf16,fp32}`,
-`--self-test` (CPU unit tests for the INT8/E4M3/E2M1/E8M0/NF4 grids).
+`--self-test` (unit tests for the INT8/E4M3/E2M1/E8M0/NF4/NF3/AF4/BOF4/APoT grids, the
+nearest-code rules and Lloyd-Max).
 
     .venv/bin/python quantization/advanced_ppl.py --self-test
     .venv/bin/python quantization/advanced_ppl.py --modes bf16 w4a4_nvfp4 --output /tmp/adv.json
@@ -98,6 +101,45 @@ dequantized values are exact in either. Official quantizes only linears inside d
 here lm_head is likewise BF16 by default, but GDN linears are quantized unless `--exclude-gdn`.
 RTN plus scale search only: no GPTQ or rotation. Full and GDN-excluded results are in
 `results/m2xfp_4096.json` and `results/m2xfp_exclude_gdn_4096.json`.
+
+### Weight-only LUT / codebook quantizers (activations BF16)
+
+No PPL has been measured for these yet (only self-tests have been run). Run them with
+`--modes lut` (expands to `bf16`, `w4_nf4_g64` and all modes below). The default `--modes`
+list is still the old 9 modes, and nothing in `results/` was changed.
+
+| Mode | Codebook / method | Scale | Nominal bpw | Source |
+|---|---|---|---:|---|
+| `w3_nf3_g64` | NF3, 8 levels (3 neg, 0, 4 pos) | FP32 absmax / 64 | 3.5 | LoftQ `create_normal_map(num_bits=3)` ([yxli2123/LoftQ](https://github.com/yxli2123/LoftQ) @ae33fd4 `glue/utils_qaunt.py`); with `num_bits=4` it reproduces NF4 bit-exactly |
+| `w4_nf4_g64` | NF4 (existing) | FP32 absmax / 64 | 4.5 | QLoRA / bitsandbytes |
+| `w4_fp4_g32`, `w4_fp4_g64` | OCP E2M1 grid {0,.5,…,6}, RNE | FP32 absmax/6 per group | 5.0 / 4.5 | OCP MX spec element grid; fixed-codebook baseline, **not** MXFP4/NVFP4 (no E8M0/E4M3 scale rounding) |
+| `w4_af4_g64` | AF4-64 (L1-optimal, fixed −1/0/1) | FP32 absmax / 64 | 4.5 | Yoshida, arXiv:2306.06965; values from `ifnspaml/bof4` `codebooks/af4/af4_64` |
+| `w4_bof4_g64` | BOF4 (MSE, B=64) | FP32 absmax / 64 | 4.5 | Blumenberg et al., arXiv:2505.06653; [ifnspaml/bof4](https://github.com/ifnspaml/bof4) @a447ef1 `codebooks/bof4/bof4_mse_64` |
+| `w4_bof4s_g64` | BOF4-S (MSE, B=64), fixed 0/+1 | signed absmax / 64 | 4.5 (+1 sign bit) | same repo, `bof4-s_mse_64` |
+| `w4_apot4_g64` | APoT 4-bit weight: sign × `build_power_value(B=3)` = {0,1,2,3,4,6,8,10}/10 | FP32 absmax / 64 | 4.5 | Li et al. ICLR'20, [yhhhli/APoT_Quantization](https://github.com/yhhhli/APoT_Quantization) @13204f1 `quant_layer.py` |
+| `w4_lut4_bof4fit_g64` | one 16-entry LUT per tensor, fitted with BOF4's empirical EM (Lloyd, centroid weighted by block-absmax², Eq. 64), initialised at BOF4 | FP32 absmax / 64 | 4.5 + 16 FP32 per tensor | BOF4 Sec. 3.2 / App. B.3 algorithm, applied to the actual weights |
+| `w4_lut4_lloyd_g64` | separate 16-entry MSE Lloyd-Max LUT **per 64-weight group**, BF16 entries | none (values in LUT) | **8.0** | plain Lloyd-Max / k-means; best-case reference for "per-group LUT" |
+| `w4_lut4_lloyd_row` | 16-entry Lloyd-Max LUT per output row (SqueezeLLM-style with no Fisher weighting) | none | 4 + 256/K | plain Lloyd-Max |
+
+All Lloyd fits use one batched, deterministic 1-D solver (`lloyd_1d`): it sorts each group,
+computes centroids from float64 prefix sums, sends exact midpoint ties to the lower level,
+leaves empty cells unchanged, and stops at the fixed point or after 100 iterations. Per-group
+and per-row LUTs start from NF4×absmax, so they are never worse than NF4 in MSE. A
+3584×1024 matrix takes under 0.1 s on GPU. Each run's `coverage` now also includes
+`w_bpw_replaced` (nominal bits per weight over the replaced linears),
+`w_rel_err_by_format` (‖W−Q(W)‖²/‖W‖²) and `modules_by_format`.
+
+Caveats: (1) APoT is a QAT method in its paper, with a learned per-layer clip α on
+standardised weights. Here it is RTN with α = group absmax. Only the level set is taken from
+the official code. The definition is unambiguous (the `B=bit-1` weight grid from the code), so
+no substitute was needed, and AF4 is included as well. (2) The BOF4/AF4 codebooks were
+optimised for Gaussian weights at B=64. `lut4_bof4fit` refits on the real weights but uses
+the same assignment rule. OPQ (outlier preservation) is not implemented. (3) BOF4-S
+signed-absmax ties use the lowest index (upstream uses `torch.max` indices). All-zero blocks
+get scale 1 (upstream would divide by 0). (4) `lut4_lloyd_g64` costs 8 bpw because each group
+stores its own 16 BF16 entries, so it is an upper bound and not a 4-bit format. (5) Every mode
+is RTN only (no GPTQ/AWQ), fake-quantized with a BF16 matmul. GDN linears are quantized
+unless `--exclude-gdn` is set, and lm_head stays BF16.
 
 ## MR-GPTQ (`mr_gptq/`)
 

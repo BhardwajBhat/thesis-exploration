@@ -183,3 +183,12 @@ and per-token pass count with the variable-loop checkpoint. Analysis, kill crite
 are in `looped/INKLING.md`.
 
 **Expert overlap (question 1) run 2026-11-26 on yellowstone A100 GPU 2: killed.** BF16 (dequantized on load, 52.8 GB), 16 prompts (chat/code/math/tool), 81k token-layers: 14.1 unique experts per token per looped layer over 3 passes (floor 8, random 22.5; kill line ~12); 4.7 of 8 shared between consecutive passes, 3.65 between passes 1 and 3; exact set reuse 2%; pass-1 top-16 covers 78% / 64% of pass-2 / pass-3 experts. Prior blog (noamshh.github.io/blog/inkling-loop-routing, 14.5M tokens) already reports the same (3.4-5.6 of 8 shared). KV sharing and pass count not started. Details: `looped/inkling/README.md`.
+
+## 13. Edge STRIDE kill test (2026-11-26): killed
+
+Idea: STRIDE look-ahead on a batch-1 edge accelerator (KV260), where a fork shares weight reads. The algorithm is
+claimed by Speculative Actions (2510.04371); GDN rollback by SpecMamba / ReplaySSM, so only the co-design was open.
+Qwen3-4B single-agent traces (yellowstone GPU 2; 26 τ², 17 BFCL tasks) replayed on a KV260 cost model: even with a free
+second stream and free prefill, 1.10x [1.06, 1.16] on τ² and 1.27x [1.20, 1.35] on BFCL; at the estimated +20% batch-2
+step cost 1.03x / 1.10x with 3% / 8% energy saving (thresholds 1.3x, 15%). Causes: 4B exact-guess rate 0.40 on τ²;
+depth-1 overlap is capped by short next turns; ~10 ms per-stream fixed cost on KV260. Details: `edge_stride/README.md`.

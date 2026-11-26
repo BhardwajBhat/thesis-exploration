@@ -1,0 +1,72 @@
+{
+  "model": "ByteDance/Ouro-1.4B",
+  "gpu": "NVIDIA GeForce RTX 4090",
+  "windows": 48,
+  "seq_len": 64,
+  "tokens": 3072,
+  "depth": {
+    "1": {
+      "nll": 6.03631591796875,
+      "perplexity": 418.34896049656646,
+      "label_top1_accuracy": 0.275390625,
+      "agreement_with_depth4": 0.4977213541666667,
+      "latency_ms_batch": 8.517139032483101,
+      "latency_relative": 1.0
+    },
+    "2": {
+      "nll": 4.451935927073161,
+      "perplexity": 85.79287208179494,
+      "label_top1_accuracy": 0.3489583333333333,
+      "agreement_with_depth4": 0.6878255208333334,
+      "latency_ms_batch": 16.93817712366581,
+      "latency_relative": 1.9887167579472547
+    },
+    "3": {
+      "nll": 3.735835691293081,
+      "perplexity": 41.923045652303855,
+      "label_top1_accuracy": 0.3860677083333333,
+      "agreement_with_depth4": 0.8606770833333334,
+      "latency_ms_batch": 25.30328333377838,
+      "latency_relative": 2.9708665359665285
+    },
+    "4": {
+      "nll": 3.590509275595347,
+      "perplexity": 36.25253375672808,
+      "label_top1_accuracy": 0.3929036458333333,
+      "agreement_with_depth4": 1.0,
+      "latency_ms_batch": 33.69234576821327,
+      "latency_relative": 3.9558290218952257
+    }
+  },
+  "oracle_first_depth_agreeing_with_depth4": {
+    "1": 0.4977213541666667,
+    "2": 0.22135416666666666,
+    "3": 0.16764322916666666,
+    "4": 0.11328125
+  },
+  "learned_gate_argmax_depth": {
+    "1": 0.0035807291666666665,
+    "2": 0.007161458333333333,
+    "3": 0.08561197916666667,
+    "4": 0.9036458333333334
+  },
+  "gate_oracle_exact_match": 0.1220703125,
+  "gate_oracle_mean_abs_depth_error": 1.9967447916666667,
+  "calibrated_margin_policy": {
+    "target_train_precision": 0.99,
+    "thresholds_depth1_to_3": [
+      1.75,
+      1.8125,
+      1.3125
+    ],
+    "eval_mean_depth": 3.2356770038604736,
+    "eval_fraction_compute_vs_depth4": 0.8089192509651184,
+    "eval_agreement_with_depth4": 0.9954426884651184,
+    "eval_exit_distribution": {
+      "1": 0.1315104216337204,
+      "2": 0.1061197891831398,
+      "3": 0.1575520783662796,
+      "4": 0.6048176884651184
+    }
+  }
+}

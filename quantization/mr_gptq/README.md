@@ -106,3 +106,20 @@ No new packages are needed; the repo `.venv` is used unchanged. The upstream clo
 needed only for the parity test: `git clone https://github.com/IST-DASLab/FP-Quant /tmp/mrgptq_src/FP-Quant`.
 At the pinned commit, upstream has no LICENSE file. The port is a re-implementation kept
 close to the upstream code, with attribution. Check this before any redistribution.
+
+## Full calibration (128 × 2048 FineWeb-Edu), 2026-11-26, yellowstone A100 80GB
+
+Same eval protocol as above (4,096 predictions, raw WikiText-2). Defaults: MSE observer, static act-order, damp 1e-2,
+Hadamard 128 (MXFP4) / 16 (NVFP4). One A100 per run, run in parallel on GPUs 2 and 3. Env: torch 2.10.0+cu128,
+transformers 5.24.1, datasets 5.2.0 (temp venv; `test_mr_gptq.py`: 7 passed, 2 parity tests skipped without
+`FPQUANT_SRC`). 186 linears, 497.6M weights, 0 Hessian-inverse fallbacks, ~3.3 GB GPU memory.
+
+| format | method | transform | PPL (full) | PPL (8 × 512 smoke) | NLL | quant time | wall |
+|---|---|---|---:|---:|---:|---:|---:|
+| MXFP4 W4A4 | MR-GPTQ | Had128 | **25.004** | 25.227 | 3.21903 | 232 s | 3 min 58 s |
+| NVFP4 W4A4 | MR-GPTQ | Had16 | **23.358** | 24.661 | 3.15094 | 244 s | 4 min 10 s |
+
+Raw JSON: `results/{mxfp,nvfp}_w4a4_mrgptq_full.json`. BF16 reference 21.168. For NVFP4, the rotated MR-GPTQ
+result (23.358) is still worse than the identity-transform GPTQ run (local full run 22.649; smoke 23.654), i.e. Had16
+does not help NVFP4 on this model, consistent with the paper's observation that NVFP4's small groups leave little
+for rotation to fix. For MXFP4, rotation + GPTQ is the best row (25.004 vs RTN 30.326 / 29.027).

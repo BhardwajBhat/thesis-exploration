@@ -19,6 +19,9 @@ Modes (W = weight format, A = activation format; blocks run along the K / input 
   w4a4_nvfp4           W/A: NVFP4, E2M1 elements, block 16, E4M3 block scale x FP32 tensor scale
   w4_nf4_g64           W: NF4 (QLoRA codebook), absmax group 64; A: BF16
   mixed_nvfp4_fp8gdn   NVFP4 W4A4 on ordinary linears, FP8 W8A8 on linear_attn.* (GDN)
+  w4a4_m2xfp           M2XFP (ASPLOS'26), port of official SJTU-ReArch-Group/M2XFP_ASPLOS26
+                       quant_func.py: W = get_quant_mxes (Sg-EM-2bit adaptive scale),
+                       A = get_quant_mxem (Elem-EM-top1 FP6), group 32 / subgroup 8, 4.5 bit
 
 Usage:
   python quantization/advanced_ppl.py --self-test
@@ -128,8 +131,111 @@ def q_nf4(x, bs=64):
     s = xb.abs().amax(-1, keepdim=True).clamp_min(1e-12)
     return _unblock(round_codebook(xb / s, NF4_GRID) * s, K)
 
-QUANT = {"int8": q_int8_row, "fp8": q_fp8_row, "mxfp4": q_mxfp4, "nvfp4": q_nvfp4, "nf4": q_nf4}
-# Nominal bits/weight incl. scale overhead: int8/fp8 ~8, mxfp4 4.25, nvfp4 4.5, nf4 g64 4.5 (fp32 absmax)
+# ----------------------------------------------------------------------------- M2XFP (exact port)
+# Port of mxq/quantize/quant_func.py from github.com/SJTU-ReArch-Group/M2XFP_ASPLOS26
+# @ 2ed16eb6 (MIT). Arithmetic is kept op-for-op identical to the official code (same FP32
+# ops, shapes, reduction dims, argmin tie rules) so results are bit-identical on the same
+# device; see QuantizerTests.test_m2xfp_*_matches_official. The only intentional deviations:
+#   * device-agnostic grids (official builds them on "cuda" at import time);
+#   * MXEM top-1 tie break is explicit lowest-index (paper Alg. 1). Official uses torch.topk,
+#     which gives lowest index on CUDA but NOT on CPU, so official-on-CPU can differ on ties.
+#   * official flattens the whole tensor to (-1, 32); we group along the last dim, which is
+#     identical whenever K % 32 == 0 (asserted, like the official code).
+
+def _float_grid(exp_bit, man_bit):
+    """Official float_value(): non-negative grid, bias 0, subnormals in the first binade."""
+    vals, first, sub = [], True, True
+    for i in range(2 ** exp_bit):
+        for j in range(2 ** man_bit):
+            if first:
+                vals.append(0.0); first = False
+            elif sub:
+                vals.append((2 ** i) * (j * 2 ** (-man_bit)))
+            else:
+                vals.append((2 ** (i - 1)) * (1 + j * 2 ** (-man_bit)))
+        sub = False
+    return torch.tensor(vals)
+
+M2X_FP4_GRID = _float_grid(2, 1)   # E2M1: 0 .5 1 1.5 2 3 4 6
+M2X_FP6_GRID = _float_grid(2, 3)   # E2M3: 0 .. 7.5 step 1/8 in first binade (32 values)
+M2X_SUBGROUP = 8
+
+def _m2x_quantize_to_grid(x, levels):
+    """Official quantize_to_grid: nearest level; exact ties on odd boundaries nudged up
+    (+5e-7) so ties round to the even code; returns (values, indices)."""
+    levels = levels.to(x.device)
+    boundaries = (levels[:-1] + levels[1:]) / 2.0
+    mask = torch.isin(x, boundaries[1::2])
+    x = x + 0.0000005 * mask
+    idx = torch.bucketize(x, boundaries).clamp_(0, len(levels) - 1)
+    return levels[idx], idx
+
+def _m2x_cast_fp4(x):
+    v, _ = _m2x_quantize_to_grid(torch.abs(x), M2X_FP4_GRID)
+    return v * torch.sign(x)
+
+def _m2x_cast_fp4_em(x):
+    """Official cast_to_fp4_em: FP4 value plus FP6(E2M3) value whose index is clamped to
+    [4*i4-1, 4*i4+2] (2-bit metadata = FP6 low bits after +1 bias, clamped)."""
+    sign, a = torch.sign(x), torch.abs(x)
+    fp4, i4 = _m2x_quantize_to_grid(a, M2X_FP4_GRID)
+    _, i6 = _m2x_quantize_to_grid(a, M2X_FP6_GRID)
+    i6.clamp_(min=i4 * 4 - 1, max=i4 * 4 + 2)
+    return fp4 * sign, M2X_FP6_GRID.to(x.device)[i6] * sign
+
+def _m2x_groups(x, group_size):
+    assert group_size % M2X_SUBGROUP == 0
+    assert x.shape[-1] % group_size == 0, "M2XFP (official) requires K % group_size == 0"
+    return x.float().reshape(-1, group_size)
+
+def q_m2xfp_mxes(x, group_size=32):
+    """M2XFP weight format (official get_quant_mxes). Per group of 32: shared exponent
+    E = floor(log2 amax) - 2 plus a group bias b in {-1,0,1} (absorbed into E8M0, free);
+    per subgroup of 8 a 2-bit mantissa ratio r in {1,1.25,1.5,1.75}. r chosen per subgroup
+    by min MSE given b, then b chosen by min mean-subgroup MSE (first index on ties)."""
+    shape, sg = x.shape, M2X_SUBGROUP
+    t = _m2x_groups(x, group_size)
+    max_val = t.abs().amax(dim=1, keepdim=True).clamp(min=1e-8)
+    t = t.reshape(-1, sg)
+    exp = torch.floor(torch.log2(max_val)) - torch.floor(torch.log2(torch.tensor(FP4_MAX, device=t.device)))
+    ratios = torch.tensor([1.0, 1.25, 1.5, 1.75], dtype=t.dtype, device=t.device)
+    nsub = group_size // sg
+    row = torch.arange(t.size(0), device=t.device)
+    deqs, mses = [], []
+    for bias in (-1, 0, 1):
+        scales = torch.pow(2, exp + bias).expand(-1, nsub).reshape(-1, 1)
+        xe = t.unsqueeze(2)
+        cand_s = scales.unsqueeze(2) * ratios.view(1, 1, -1)
+        cand_q = _m2x_cast_fp4(xe / cand_s) * cand_s
+        mse = (cand_q - xe).pow(2).mean(dim=1)
+        best = mse.argmin(dim=1)
+        deqs.append(cand_q[row, :, best].reshape(-1, group_size))
+        mses.append(mse[row, best].view(-1, nsub).mean(dim=1, keepdim=True))
+    best_b = torch.cat(mses, dim=1).argmin(dim=1)
+    all_deq = torch.stack(deqs, 0)
+    out = torch.gather(all_deq, 0, best_b.view(1, -1, 1).expand(1, -1, group_size)).squeeze(0)
+    return out.reshape(shape)
+
+def q_m2xfp_mxem(x, group_size=32):
+    """M2XFP activation format (official get_quant_mxem). OCP-floor shared scale
+    2^(floor(log2 amax) - 2) per group of 32, all elements E2M1, except the top-1 |FP4|
+    element of each subgroup of 8 (lowest index on ties) which gets the clamped FP6 value."""
+    shape, sg = x.shape, M2X_SUBGROUP
+    t = _m2x_groups(x, group_size)
+    max_val = t.abs().amax(dim=1, keepdim=True).clamp(min=1e-8)
+    exp = torch.floor(torch.log2(max_val)) - torch.floor(torch.log2(torch.tensor(FP4_MAX, device=t.device)))
+    scales = torch.pow(2, exp)
+    fp4, fp6 = _m2x_cast_fp4_em(t / scales)
+    a = fp4.reshape(-1, sg).abs()
+    # lowest index among maxima (== official torch.topk(.,1) on CUDA; paper Alg. 1)
+    top = (a == a.amax(dim=1, keepdim=True)).to(torch.uint8).argmax(dim=1, keepdim=True)
+    mask = torch.zeros_like(a).scatter_(1, top, 1).reshape(-1, group_size)
+    return ((fp4 * (1 - mask) + fp6 * mask) * scales).reshape(shape)
+
+QUANT = {"int8": q_int8_row, "fp8": q_fp8_row, "mxfp4": q_mxfp4, "nvfp4": q_nvfp4, "nf4": q_nf4,
+         "m2xfp_mxes": q_m2xfp_mxes, "m2xfp_mxem": q_m2xfp_mxem}
+# Nominal bits/weight incl. scale overhead: int8/fp8 ~8, mxfp4 4.25, nvfp4 4.5, nf4 g64 4.5 (fp32 absmax),
+# m2xfp 4.5 (E8M0 scale + 8 bits metadata per 32: 4 x 2-bit subgroup codes)
 
 # (weight_fmt, act_fmt) for ordinary linears and for GDN linears
 MODES = {
@@ -141,6 +247,7 @@ MODES = {
     "w4a4_nvfp4":         {"default": ("nvfp4", "nvfp4"), "gdn": ("nvfp4", "nvfp4")},
     "w4_nf4_g64":         {"default": ("nf4", None),      "gdn": ("nf4", None)},
     "mixed_nvfp4_fp8gdn": {"default": ("nvfp4", "nvfp4"), "gdn": ("fp8", "fp8")},
+    "w4a4_m2xfp":         {"default": ("m2xfp_mxes", "m2xfp_mxem"), "gdn": ("m2xfp_mxes", "m2xfp_mxem")},
 }
 
 # ----------------------------------------------------------------------------- module replacement
@@ -394,6 +501,108 @@ class QuantizerTests(unittest.TestCase):
         m = M(); cov = apply_mode(m, "w4_nf4_g64", include_lm_head=True)
         self.assertEqual(cov["a_quant_params"], 0)
         self.assertEqual(cov["w_quant_frac_of_linear"], 1.0)
+
+    # ---------------------------------------------------------------- M2XFP vs official oracle
+    @staticmethod
+    def _official():
+        """Load the verbatim official quant_func.py (third_party/). It allocates its grids on
+        'cuda' at import, so it needs a CUDA build+device."""
+        if not torch.cuda.is_available():
+            raise unittest.SkipTest("official quant_func.py builds grids on cuda at import")
+        import importlib.util, pathlib
+        p = pathlib.Path(__file__).resolve().parent / "third_party" / "m2xfp_quant_func.py"
+        spec = importlib.util.spec_from_file_location("m2xfp_official", p)
+        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        return mod
+
+    @staticmethod
+    def _m2x_inputs(dev):
+        g = torch.Generator(device="cpu").manual_seed(1)
+        xs = [torch.randn(4, 64, generator=g),
+              torch.randn(3, 96, generator=g) * torch.logspace(-4, 4, 96),   # wide dynamic range
+              torch.randn(2, 5, 128, generator=g) * 0.02,                     # 3-D activation shape
+              torch.randn(6, 32, generator=g).pow(3),                         # heavy tails
+              torch.zeros(2, 32),                                             # all-zero groups
+              # exact FP4 grid values / boundaries x powers of two: many ties
+              (M2X_FP4_GRID[torch.randint(0, 8, (8, 64), generator=g)]
+               * torch.randint(0, 2, (8, 64), generator=g).mul(2).sub(1)
+               * 2.0 ** torch.randint(-3, 4, (8, 1), generator=g)),
+              torch.tensor([0.25, 0.75, 1.25, 1.75, 2.5, 3.5, 5.0, 6.0] * 4).repeat(2, 1)]
+        xs.append(torch.randn(4, 64, generator=g).to(torch.bfloat16).float())
+        return [x.to(dev) for x in xs]
+
+    def test_m2xfp_grids_match_official_definition(self):
+        self.assertTrue(torch.equal(M2X_FP4_GRID, FP4_GRID))
+        self.assertEqual(len(M2X_FP6_GRID), 32)
+        self.assertTrue(torch.equal(M2X_FP6_GRID[:8], torch.arange(8) / 8))
+        self.assertEqual(M2X_FP6_GRID[-1].item(), 7.5)
+        # E2M1 rounding of official helper == this harness's RNE E2M1 rounding
+        x = torch.randn(20000) * 4
+        x = torch.cat([x, torch.tensor([0.25, 0.75, 1.25, 1.75, 2.5, 3.5, 5.0, -0.25, -2.5, -5.0])])
+        self.assertTrue(torch.equal(_m2x_cast_fp4(x), round_fp4_e2m1(x)))
+
+    def test_m2xfp_mxes_matches_official(self):
+        off = self._official()
+        for x in self._m2x_inputs("cuda"):
+            ref = off.get_quant_mxes(x, 32)
+            self.assertTrue(torch.equal(q_m2xfp_mxes(x, 32), ref), tuple(x.shape))
+        # half-precision input path used by the official harness (fp16 model)
+        w = torch.randn(16, 256, device="cuda").half()
+        self.assertTrue(torch.equal(q_m2xfp_mxes(w, 32).half(), off.get_quant_mxes(w, 32)))
+
+    def test_m2xfp_mxem_matches_official(self):
+        off = self._official()
+        for x in self._m2x_inputs("cuda"):
+            ref = off.get_quant_mxem(x, 32)
+            self.assertTrue(torch.equal(q_m2xfp_mxem(x, 32), ref), tuple(x.shape))
+        a = torch.randn(7, 1024, device="cuda").bfloat16()
+        self.assertTrue(torch.equal(q_m2xfp_mxem(a, 32).bfloat16(), off.get_quant_mxem(a, 32)))
+
+    def test_m2xfp_cpu_matches_official_on_cpu(self):
+        """Run the official functions on CPU (grids moved) - MXES must be identical; MXEM may
+        differ only where CPU torch.topk breaks FP4 ties at a non-lowest index."""
+        off = self._official()
+        off.FP4_E2M1_GRID, off.FP6_E2M3_GRID = off.FP4_E2M1_GRID.cpu(), off.FP6_E2M3_GRID.cpu()
+        for x in self._m2x_inputs("cpu"):
+            self.assertTrue(torch.equal(q_m2xfp_mxes(x, 32), off.get_quant_mxes(x, 32)))
+            ours, ref = q_m2xfp_mxem(x, 32), off.get_quant_mxem(x, 32)
+            diff = (ours != ref).reshape(-1, 8).any(1)
+            fp4 = _m2x_cast_fp4(_blocks(x, 32)[0] / torch.exp2(mx_scale_exp(
+                _blocks(x, 32)[0].abs().amax(-1, keepdim=True).clamp(min=1e-8)))).reshape(-1, 8).abs()
+            tied = ((fp4 == fp4.amax(1, keepdim=True)).sum(1) > 1)
+            self.assertFalse((diff & ~tied).any(), tuple(x.shape))
+
+    def test_m2xfp_handworked(self):
+        # MXEM: group amax 5.2 -> E = floor(log2 5.2) - 2 = 0, scale 1. Subgroup 0 top-1 is
+        # 5.2 (> 5 -> FP4 6, index 7), so its FP6 index is clamped to [27, 30]:
+        # nearest FP6 to 5.2 is 5.0 (index 26) -> clamped to 27 -> 5.5. Others FP4.
+        x = torch.tensor([[5.2, 0.3, -1.1, 2.6, 0.0, 0.1, 0.7, -3.4] + [0.9] * 8 + [0.0] * 16])
+        q = q_m2xfp_mxem(x, 32)
+        self.assertEqual(q[0, :8].tolist(), [5.5, 0.5, -1.0, 3.0, 0.0, 0.0, 0.5, -3.0])
+        # subgroup 1: all FP4 = 1.0, lowest index gets FP6(0.9)=0.875 (idx 7, clamp [7,10])
+        self.assertEqual(q[0, 8:16].tolist(), [0.875] + [1.0] * 7)
+        # all-zero subgroup: FP6 of 0 is 0
+        self.assertEqual(q[0, 16:].abs().sum().item(), 0.0)
+        # MXES on a group whose values are exactly 1.25 x FP4 grid: recovered losslessly
+        w = (FP4_GRID.repeat(4) * 1.25 * 0.5).view(1, 32)
+        self.assertTrue(torch.equal(q_m2xfp_mxes(w, 32), w))
+        # never worse than MXFP4 (b=0, r=1 is in the search space) per group in MSE
+        w = torch.randn(64, 256)
+        e_m2 = (q_m2xfp_mxes(w) - w).pow(2).reshape(-1, 32).mean(1)
+        e_mx = (q_mxfp4(w) - w).pow(2).reshape(-1, 32).mean(1)
+        self.assertTrue((e_m2 <= e_mx + 1e-12).all())
+        self.assertRaises(AssertionError, q_m2xfp_mxes, torch.randn(2, 40))
+
+    def test_m2xfp_mode(self):
+        lin = nn.Linear(64, 8, bias=True)
+        x = torch.randn(5, 64)
+        ql = QLinear(lin, *MODES["w4a4_m2xfp"]["default"], compute_dtype=torch.float32)
+        ref = F.linear(q_m2xfp_mxem(x), q_m2xfp_mxes(lin.weight.float()), lin.bias)
+        self.assertTrue(torch.allclose(ql(x), ref, atol=1e-5))
+        # dequantized values are exactly representable in bf16 (<= 7 significant bits)
+        w = q_m2xfp_mxes(torch.randn(32, 256)); a = q_m2xfp_mxem(torch.randn(32, 256))
+        self.assertTrue(torch.equal(w.bfloat16().float(), w))
+        self.assertTrue(torch.equal(a.bfloat16().float(), a))
 
 if __name__ == "__main__":
     main()

@@ -33,7 +33,7 @@ Same protocol as above (4,096 predictions, 8 x 512 windows). Selected
 `nn.Linear`s are replaced by `QLinear`, which fake-quantizes the weight once
 and the **input activation on every call**. Modes: `bf16`, `a8_int8`,
 `w8a8_int8`, `w8a8_fp8`, `w4a4_mxfp4`, `w4a4_nvfp4`, `w4_nf4_g64`,
-`mixed_nvfp4_fp8gdn` (NVFP4 everywhere except GDN `linear_attn.*` = FP8).
+`mixed_nvfp4_fp8gdn` (NVFP4 everywhere except GDN `linear_attn.*` = FP8), `w4a4_m2xfp` (M²XFP: MXES weights / MXEM activations, group 32, subgroup 8, 4.5 bit).
 Options: `--exclude-gdn`, `--include-lm-head`, `--compute-dtype {bf16,fp32}`,
 `--self-test` (CPU unit tests for the INT8/E4M3/E2M1/E8M0/NF4 grids).
 
@@ -49,3 +49,22 @@ scale is dynamic per call (optimistic versus calibrated static scales); MXFP4
 uses the OCP floor-based shared exponent; FP8/INT8 activation scales are dynamic
 per token; RTN only (no GPTQ/AWQ/rotation); GDN recurrent state, conv1d,
 attention softmax and KV cache are not quantized.
+
+### M²XFP (`w4a4_m2xfp`)
+
+Port of the official pseudo-quant functions `get_quant_mxes` (weights) and
+`get_quant_mxem` (activations) from `mxq/quantize/quant_func.py` of
+[SJTU-ReArch-Group/M2XFP_ASPLOS26](https://github.com/SJTU-ReArch-Group/M2XFP_ASPLOS26)
+@ `2ed16eb6`, the W4 `mxes` / A4 `mxem` / group 32 configuration from its `llama3_run.sh`
+(paper arXiv:2601.19213: Sg-EM-2bit weights, Elem-EM-top1 activations). A verbatim copy of the
+official file (MIT, `third_party/`) is used only as a test oracle: on CUDA the port is
+bit-identical (`torch.equal`) on random, wide-range, heavy-tailed, zero, tie-heavy and
+bf16/fp16 inputs.
+
+Differences from the official repo: grids are device-agnostic; MXEM picks the lowest index on
+top-1 ties explicitly (the paper's Alg. 1; official `torch.topk` does this on CUDA but not on
+CPU); K must be a multiple of 32, which holds for every Qwen3.5-0.8B linear (1024/2048/3584);
+the official harness runs FP16 with matmul in FP16 while this one uses BF16, and the
+dequantized values are exact in either. Official quantizes only linears inside decoder blocks;
+here lm_head is likewise BF16 by default, but GDN linears are quantized unless `--exclude-gdn`.
+RTN plus scale search only: no GPTQ or rotation. Not run on the model yet.

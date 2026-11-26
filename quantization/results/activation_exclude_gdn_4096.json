@@ -1,0 +1,553 @@
+{
+  "model": "Qwen/Qwen3.5-0.8B",
+  "dataset": "https://raw.githubusercontent.com/pytorch/examples/main/word_language_model/data/wikitext-2/test.txt",
+  "protocol": "first 4097 tokenizer tokens, independent 512-token windows, 4096 next-token predictions, FP32 cross entropy",
+  "options": {
+    "exclude_gdn": true,
+    "include_lm_head": false,
+    "compute_dtype": "bf16"
+  },
+  "results": {
+    "bf16": {
+      "nll": 3.052476704120636,
+      "ppl": 21.167705698008312,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          null,
+          null
+        ],
+        "gdn": [
+          null,
+          null
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 0,
+        "a_quant_params": 0,
+        "w_quant_modules": 0,
+        "a_quant_modules": 0,
+        "by_format": {},
+        "skipped": {
+          "all": 187
+        },
+        "modules_by_format": {},
+        "w_bits": 0.0,
+        "w_quant_frac_of_linear": 0.0,
+        "w_quant_frac_of_model": 0.0,
+        "a_quant_frac_of_linear": 0.0,
+        "w_bpw_replaced": null,
+        "w_rel_err_by_format": {}
+      },
+      "qlinear_modules": 0,
+      "qlinear_min_calls": 0,
+      "seconds": 1.2142021656036377
+    },
+    "a8_int8": {
+      "nll": 3.059843987226486,
+      "ppl": 21.324230050224497,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          null,
+          "int8"
+        ],
+        "gdn": [
+          null,
+          "int8"
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 0,
+        "a_quant_params": 308281344,
+        "w_quant_modules": 0,
+        "a_quant_modules": 96,
+        "by_format": {
+          "W=bf16,A=int8": 308281344
+        },
+        "skipped": {
+          "gdn": 90,
+          "lm_head": 1
+        },
+        "modules_by_format": {
+          "W=bf16,A=int8": 96
+        },
+        "w_quant_frac_of_linear": 0.0,
+        "w_quant_frac_of_model": 0.0,
+        "a_quant_frac_of_linear": 0.4100061012812691,
+        "w_bpw_replaced": 16.0,
+        "w_rel_err_by_format": {
+          "W=bf16,A=int8": 0.0
+        }
+      },
+      "qlinear_modules": 96,
+      "qlinear_min_calls": 8,
+      "seconds": 1.1354799270629883
+    },
+    "a8_fp8": {
+      "nll": 3.0577133297920227,
+      "ppl": 21.278843789390816,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          null,
+          "fp8"
+        ],
+        "gdn": [
+          null,
+          "fp8"
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 0,
+        "a_quant_params": 308281344,
+        "w_quant_modules": 0,
+        "a_quant_modules": 96,
+        "by_format": {
+          "W=bf16,A=fp8": 308281344
+        },
+        "skipped": {
+          "gdn": 90,
+          "lm_head": 1
+        },
+        "modules_by_format": {
+          "W=bf16,A=fp8": 96
+        },
+        "w_quant_frac_of_linear": 0.0,
+        "w_quant_frac_of_model": 0.0,
+        "a_quant_frac_of_linear": 0.4100061012812691,
+        "w_bpw_replaced": 16.0,
+        "w_rel_err_by_format": {
+          "W=bf16,A=fp8": 0.0
+        }
+      },
+      "qlinear_modules": 96,
+      "qlinear_min_calls": 8,
+      "seconds": 1.106997013092041
+    },
+    "a8_fp8_static": {
+      "nll": 3.0580118000507355,
+      "ppl": 21.285195839303576,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          null,
+          "fp8_static"
+        ],
+        "gdn": [
+          null,
+          "fp8_static"
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 0,
+        "a_quant_params": 308281344,
+        "w_quant_modules": 0,
+        "a_quant_modules": 96,
+        "by_format": {
+          "W=bf16,A=fp8_static": 308281344
+        },
+        "skipped": {
+          "gdn": 90,
+          "lm_head": 1
+        },
+        "modules_by_format": {
+          "W=bf16,A=fp8_static": 96
+        },
+        "w_quant_frac_of_linear": 0.0,
+        "w_quant_frac_of_model": 0.0,
+        "a_quant_frac_of_linear": 0.4100061012812691,
+        "w_bpw_replaced": 16.0,
+        "w_rel_err_by_format": {
+          "W=bf16,A=fp8_static": 0.0
+        },
+        "static_saturated_frac": 1.618891586492091e-08,
+        "static_scale_range": [
+          0.005929129464285714,
+          0.15736607142857142
+        ]
+      },
+      "qlinear_modules": 96,
+      "qlinear_min_calls": 8,
+      "seconds": 1.0841009616851807
+    },
+    "a8_mxfp8": {
+      "nll": 3.061184287071228,
+      "ppl": 21.35283007447265,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          null,
+          "mxfp8"
+        ],
+        "gdn": [
+          null,
+          "mxfp8"
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 0,
+        "a_quant_params": 308281344,
+        "w_quant_modules": 0,
+        "a_quant_modules": 96,
+        "by_format": {
+          "W=bf16,A=mxfp8": 308281344
+        },
+        "skipped": {
+          "gdn": 90,
+          "lm_head": 1
+        },
+        "modules_by_format": {
+          "W=bf16,A=mxfp8": 96
+        },
+        "w_quant_frac_of_linear": 0.0,
+        "w_quant_frac_of_model": 0.0,
+        "a_quant_frac_of_linear": 0.4100061012812691,
+        "w_bpw_replaced": 16.0,
+        "w_rel_err_by_format": {
+          "W=bf16,A=mxfp8": 0.0
+        }
+      },
+      "qlinear_modules": 96,
+      "qlinear_min_calls": 8,
+      "seconds": 1.0994560718536377
+    },
+    "a4_int4": {
+      "nll": 5.787559449672699,
+      "ppl": 326.21590573203775,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          null,
+          "int4"
+        ],
+        "gdn": [
+          null,
+          "int4"
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 0,
+        "a_quant_params": 308281344,
+        "w_quant_modules": 0,
+        "a_quant_modules": 96,
+        "by_format": {
+          "W=bf16,A=int4": 308281344
+        },
+        "skipped": {
+          "gdn": 90,
+          "lm_head": 1
+        },
+        "modules_by_format": {
+          "W=bf16,A=int4": 96
+        },
+        "w_quant_frac_of_linear": 0.0,
+        "w_quant_frac_of_model": 0.0,
+        "a_quant_frac_of_linear": 0.4100061012812691,
+        "w_bpw_replaced": 16.0,
+        "w_rel_err_by_format": {
+          "W=bf16,A=int4": 0.0
+        }
+      },
+      "qlinear_modules": 96,
+      "qlinear_min_calls": 8,
+      "seconds": 1.2369844913482666
+    },
+    "w8a8_int8": {
+      "nll": 3.063287079334259,
+      "ppl": 21.39777788173547,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          "int8",
+          "int8"
+        ],
+        "gdn": [
+          "int8",
+          "int8"
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 308281344,
+        "a_quant_params": 308281344,
+        "w_quant_modules": 96,
+        "a_quant_modules": 96,
+        "by_format": {
+          "W=int8,A=int8": 308281344
+        },
+        "skipped": {
+          "gdn": 90,
+          "lm_head": 1
+        },
+        "modules_by_format": {
+          "W=int8,A=int8": 96
+        },
+        "w_quant_frac_of_linear": 0.4100061012812691,
+        "w_quant_frac_of_model": 0.40973445282767534,
+        "a_quant_frac_of_linear": 0.4100061012812691,
+        "w_bpw_replaced": 8.0,
+        "w_rel_err_by_format": {
+          "W=int8,A=int8": 8.549233553072049e-05
+        }
+      },
+      "qlinear_modules": 96,
+      "qlinear_min_calls": 8,
+      "seconds": 1.1090538501739502
+    },
+    "sq05_bf16": {
+      "nll": 3.0527178943157196,
+      "ppl": 21.172811756815992,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          null,
+          null
+        ],
+        "gdn": [
+          null,
+          null
+        ],
+        "smooth": 0.5
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 0,
+        "a_quant_params": 0,
+        "w_quant_modules": 0,
+        "a_quant_modules": 0,
+        "by_format": {},
+        "skipped": {
+          "all": 187
+        },
+        "modules_by_format": {},
+        "w_bits": 0.0,
+        "w_quant_frac_of_linear": 0.0,
+        "w_quant_frac_of_model": 0.0,
+        "a_quant_frac_of_linear": 0.0,
+        "w_bpw_replaced": null,
+        "w_rel_err_by_format": {},
+        "smoothquant": {
+          "alpha": 0.5,
+          "norms": 30,
+          "scale_min": 3.006354570388794,
+          "scale_max": 25.057016372680664,
+          "smoothed_linears": 66,
+          "smoothed_params": 207618048
+        }
+      },
+      "qlinear_modules": 0,
+      "qlinear_min_calls": 0,
+      "seconds": 1.0716049671173096
+    },
+    "w8a8_int8_sq05": {
+      "nll": 3.061432719230652,
+      "ppl": 21.358135463145157,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          "int8",
+          "int8"
+        ],
+        "gdn": [
+          "int8",
+          "int8"
+        ],
+        "smooth": 0.5
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 308281344,
+        "a_quant_params": 308281344,
+        "w_quant_modules": 96,
+        "a_quant_modules": 96,
+        "by_format": {
+          "W=int8,A=int8": 308281344
+        },
+        "skipped": {
+          "gdn": 90,
+          "lm_head": 1
+        },
+        "modules_by_format": {
+          "W=int8,A=int8": 96
+        },
+        "w_quant_frac_of_linear": 0.4100061012812691,
+        "w_quant_frac_of_model": 0.40973445282767534,
+        "a_quant_frac_of_linear": 0.4100061012812691,
+        "w_bpw_replaced": 8.0,
+        "w_rel_err_by_format": {
+          "W=int8,A=int8": 9.910812852482258e-05
+        },
+        "smoothquant": {
+          "alpha": 0.5,
+          "norms": 30,
+          "scale_min": 3.006354570388794,
+          "scale_max": 25.057016372680664,
+          "smoothed_linears": 66,
+          "smoothed_params": 207618048
+        }
+      },
+      "qlinear_modules": 96,
+      "qlinear_min_calls": 8,
+      "seconds": 1.214632272720337
+    },
+    "w8a8_fp8": {
+      "nll": 3.0531498789787292,
+      "ppl": 21.181960062589358,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          "fp8",
+          "fp8"
+        ],
+        "gdn": [
+          "fp8",
+          "fp8"
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 308281344,
+        "a_quant_params": 308281344,
+        "w_quant_modules": 96,
+        "a_quant_modules": 96,
+        "by_format": {
+          "W=fp8,A=fp8": 308281344
+        },
+        "skipped": {
+          "gdn": 90,
+          "lm_head": 1
+        },
+        "modules_by_format": {
+          "W=fp8,A=fp8": 96
+        },
+        "w_quant_frac_of_linear": 0.4100061012812691,
+        "w_quant_frac_of_model": 0.40973445282767534,
+        "a_quant_frac_of_linear": 0.4100061012812691,
+        "w_bpw_replaced": 8.0,
+        "w_rel_err_by_format": {
+          "W=fp8,A=fp8": 0.0006951715995166473
+        }
+      },
+      "qlinear_modules": 96,
+      "qlinear_min_calls": 8,
+      "seconds": 1.088871717453003
+    },
+    "w8a8_fp8_static": {
+      "nll": 3.0588381588459015,
+      "ppl": 21.302792317593177,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          "fp8",
+          "fp8_static"
+        ],
+        "gdn": [
+          "fp8",
+          "fp8_static"
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 308281344,
+        "a_quant_params": 308281344,
+        "w_quant_modules": 96,
+        "a_quant_modules": 96,
+        "by_format": {
+          "W=fp8,A=fp8_static": 308281344
+        },
+        "skipped": {
+          "gdn": 90,
+          "lm_head": 1
+        },
+        "modules_by_format": {
+          "W=fp8,A=fp8_static": 96
+        },
+        "w_quant_frac_of_linear": 0.4100061012812691,
+        "w_quant_frac_of_model": 0.40973445282767534,
+        "a_quant_frac_of_linear": 0.4100061012812691,
+        "w_bpw_replaced": 8.0,
+        "w_rel_err_by_format": {
+          "W=fp8,A=fp8_static": 0.0006951715995166473
+        },
+        "static_saturated_frac": 2.2075794361255786e-08,
+        "static_scale_range": [
+          0.005929129464285714,
+          0.15736607142857142
+        ]
+      },
+      "qlinear_modules": 96,
+      "qlinear_min_calls": 8,
+      "seconds": 1.1061997413635254
+    },
+    "w8a8_mxfp8": {
+      "nll": 3.076776534318924,
+      "ppl": 21.688377854285573,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          "mxfp8",
+          "mxfp8"
+        ],
+        "gdn": [
+          "mxfp8",
+          "mxfp8"
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 308281344,
+        "a_quant_params": 308281344,
+        "w_quant_modules": 96,
+        "a_quant_modules": 96,
+        "by_format": {
+          "W=mxfp8,A=mxfp8": 308281344
+        },
+        "skipped": {
+          "gdn": 90,
+          "lm_head": 1
+        },
+        "modules_by_format": {
+          "W=mxfp8,A=mxfp8": 96
+        },
+        "w_quant_frac_of_linear": 0.4100061012812691,
+        "w_quant_frac_of_model": 0.40973445282767534,
+        "a_quant_frac_of_linear": 0.4100061012812691,
+        "w_bpw_replaced": 8.25,
+        "w_rel_err_by_format": {
+          "W=mxfp8,A=mxfp8": 0.0008935515024390827
+        }
+      },
+      "qlinear_modules": 96,
+      "qlinear_min_calls": 8,
+      "seconds": 1.2198741436004639
+    }
+  },
+  "calibration": {
+    "dataset": "https://raw.githubusercontent.com/pytorch/examples/main/word_language_model/data/wikitext-2/train.txt",
+    "samples": 32,
+    "seqlen": 512,
+    "tokens": 16384,
+    "model": "BF16 (unquantized)",
+    "statistic": "per-input-channel max |x| per nn.Linear",
+    "seconds": 4.199279308319092
+  }
+}

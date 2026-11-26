@@ -16,11 +16,14 @@ the common harness; checkpoint rows use their authors' layer selection.
 | **BF16** | 16/16 | — | BF16 | 0% | **21.168** | — | HF |
 | FP8 W8A8 | 8/8 | dynamic RTN | **BF16** | 41.0% | **21.182** | **+0.07%** | Sim |
 | AWQ INT8 | 8/16 | calibrated AWQ | quantized | checkpoint | 21.208 | +0.19% | HF checkpoint |
+| FP8 W8A8, static A | 8/8 | per-tensor A scale, 16k-token calib | quantized | 66.2% | 21.261 | +0.44% | Sim |
 | INT8 W8A16 | 8/16 | per-row RTN | quantized | 66.2% | 21.278 | +0.52% | Sim |
 | FP8 dynamic checkpoint | 8/8 | dynamic | checkpoint-defined | checkpoint | 21.279 | +0.52% | HF checkpoint |
 | FP8 W8A8 | 8/8 | dynamic RTN | quantized | 66.2% | 21.291 | +0.58% | Sim |
 | Activation-only INT8 | 16/8 | per-token RTN | quantized | 66.2% | 21.388 | +1.04% | Sim |
 | INT8 W8A8 | 8/8 | dynamic RTN | quantized | 66.2% | 21.477 | +1.46% | Sim |
+| SmoothQuant INT8 W8A8 | 8/8 | α=0.5 fold + dynamic RTN | quantized | 66.2% | 21.511 | +1.62% | Sim |
+| MXFP8 W8A8 | 8/8 | E4M3 + E8M0 block 32 | quantized | 66.2% | 21.645 | +2.26% | Sim |
 | **GPTQ INT4** | 4/16 | AutoRound/GPTQ g128 | **BF16** | checkpoint | **21.612** | **+2.10%** | HF checkpoint |
 | MR-GPTQ NVFP4 | 4/4 | GPTQ, **no rotation**, 128x2048 calib | quantized | 66.2% | 22.649 | +7.00% | Sim |
 | NF4 g64 | 4/16 | RTN | **BF16** | 41.0% | 22.609 | +6.81% | Sim |
@@ -64,11 +67,14 @@ Same protocol as above (4,096 predictions, 8 x 512 windows). Selected
 and the **input activation on every call**. Modes: `bf16`, `a8_int8`,
 `w8a8_int8`, `w8a8_fp8`, `w4a4_mxfp4`, `w4a4_nvfp4`, `w4_nf4_g64`,
 `mixed_nvfp4_fp8gdn` (NVFP4 everywhere except GDN `linear_attn.*` = FP8), `w4a4_m2xfp` (M²XFP: MXES weights / MXEM activations, group 32, subgroup 8, 4.5 bit).
+Activation-quant modes (`a8_fp8`, `a8_fp8_static`, `w8a8_fp8_static`, `a8_mxfp8`, `w8a8_mxfp8`,
+`a4_int4`, `w8a8_int8_sq05`, `sq05_bf16`) are described below (`--modes act`).
 Weight-only LUT/codebook modes (`w3_nf3_g64`, `w4_fp4_g32/g64`, `w4_af4_g64`, `w4_bof4_g64`,
 `w4_bof4s_g64`, `w4_apot4_g64`, `w4_lut4_*`) are described below (`--modes lut`).
 Options: `--exclude-gdn`, `--include-lm-head`, `--compute-dtype {bf16,fp32}`,
-`--self-test` (unit tests for the INT8/E4M3/E2M1/E8M0/NF4/NF3/AF4/BOF4/APoT grids, the
-nearest-code rules and Lloyd-Max).
+`--self-test` (unit tests for the INT8/INT4/E4M3/E2M1/E8M0/MXFP8/NF4/NF3/AF4/BOF4/APoT grids, the
+nearest-code rules, Lloyd-Max, static FP8 calibration and the SmoothQuant fold),
+`--calib-samples/--calib-seqlen` (calibration set for static scales and SmoothQuant).
 
     .venv/bin/python quantization/advanced_ppl.py --self-test
     .venv/bin/python quantization/advanced_ppl.py --modes bf16 w4a4_nvfp4 --output /tmp/adv.json
@@ -194,6 +200,116 @@ Caveats:
    So the 245.8 is a fair result for *greedy* RTN BCQ at 3 bits on this model, not a bug.
    It should not be read as a bound on what BCQ can achieve. Padded tail columns are left
    out of the means, which never happens for Qwen3.5 since K is a multiple of 128.
+
+### Activation quantization (`--modes act`)
+
+Same 4,096-prediction protocol and harness. Coverage is the fraction of linear weights whose
+**input activation** is quantized: 186 linears / 66.2% by default and 96 linears / 41.0% with
+`--exclude-gdn`. lm_head stays BF16. All rows are fake-quant simulation (quantize, dequantize,
+then a BF16 matmul). **None of these numbers say anything about native FP8/INT8/MX kernel speed.**
+Raw results are in `results/activation_4096.json` and `results/activation_exclude_gdn_4096.json`.
+
+| Mode | W | A | Calib. | PPL, GDN quantized (66.2%) | Δ | PPL, GDN BF16 (41.0%) | Δ |
+|---|---|---|---|---:|---:|---:|---:|
+| `bf16` | BF16 | BF16 | — | 21.168 | — | 21.168 | — |
+| `a8_int8` | BF16 | INT8 per-token dynamic | — | 21.388 | +1.04% | 21.324 | +0.74% |
+| `a8_fp8` | BF16 | FP8 E4M3 per-token dynamic | — | 21.413 | +1.16% | 21.279 | +0.53% |
+| `a8_fp8_static` | BF16 | FP8 E4M3 per-tensor **static** | 32×512 | **21.367** | **+0.94%** | 21.285 | +0.56% |
+| `a8_mxfp8` | BF16 | MXFP8 E4M3, block 32, E8M0 | — | 21.443 | +1.30% | 21.353 | +0.87% |
+| `a4_int4` | BF16 | INT4 per-token dynamic | — | 1582.8 | +7377% | 326.2 | +1441% |
+| `w8a8_int8` | INT8 per-channel | INT8 per-token | — | 21.477 | +1.46% | 21.398 | +1.09% |
+| `sq05_bf16` (fold only) | BF16 (W·s) | BF16 | 32×512 | 21.189 | +0.10% | 21.173 | +0.02% |
+| `w8a8_int8_sq05` | INT8 per-channel, SmoothQuant α=0.5 | INT8 per-token | 32×512 | 21.511 | +1.62% | 21.358 | +0.90% |
+| `w8a8_fp8` | FP8 per-channel | FP8 per-token dynamic | — | 21.291 | +0.58% | **21.182** | **+0.07%** |
+| `w8a8_fp8_static` | FP8 per-channel | FP8 per-tensor **static** | 32×512 | **21.261** | **+0.44%** | 21.303 | +0.64% |
+| `w8a8_mxfp8` | **MXFP8 E4M3 (FP8 weights)**, block 32 | MXFP8 E4M3, block 32 | — | 21.645 | +2.26% | 21.688 | +2.46% |
+
+Takeaways:
+- Every 8-bit activation format costs about 0.5–1.3% PPL by itself. GDN projections cause
+  roughly half of that: excluding them halves the A8 loss for every format.
+- MXFP8 (power-of-two E8M0 scale per 32) is *worse* than per-token FP8 here, both
+  activation-only and as W8A8. Floor-based E8M0 leaves the block max between 256 and 512, so a
+  block uses between 1.75× and 0.875× of E4M3's range. That costs up to about 1 bit of mantissa
+  headroom per block, compared with an exact FP32 per-token scale. Qwen3.5-0.8B activations
+  have no per-block outliers large enough to make up for that loss.
+- Static per-tensor FP8 calibrated on 16k tokens is as good as dynamic per-token, and slightly
+  better on the full-coverage run. Only about 2–3×10⁻⁸ of evaluation activations exceeded the
+  calibrated range and saturated. The static scale is also the *deployable* one (no per-call
+  amax reduction).
+- SmoothQuant α=0.5 does **not** help INT8 W8A8 on this model when the GDN projections are
+  quantized (+1.62% vs +1.46% without it). With GDN in BF16 it helps a little
+  (+0.90% vs +1.09%). Per-token dynamic INT8 already absorbs most of the per-token range, and
+  migrating channel scale into W raises the INT8 weight error by 19% (relerr 8.35e-5 → 9.97e-5).
+- INT4 per-token activations without rotation or outlier handling are unusable (PPL > 300).
+  This mode is a floor reference, not a candidate.
+
+Definitions and sources:
+- **FP8 E4M3 per-token dynamic** (`a8_fp8`): s = amax_token/448, RNE to E4M3FN (via
+  `torch.float8_e4m3fn`), saturate at ±448. These are the compressed-tensors `FP8_DYNAMIC`
+  activation args (`FLOAT`, 8 bit, `TOKEN`, dynamic, symmetric). `w8a8_fp8` is the existing
+  mode with per-channel FP8 weights.
+- **MXFP8** (`q_mxfp8`): OCP MX v1.0 §6.3 with E4M3 elements, k=32 along K, and an E8M0 scale
+  X = 2^(⌊log₂ amax⌋ − 8) (emax_elem = 8 because 448 = 2⁸·1.75), clamped to [−127, 127].
+  Elements are RNE with clamp-to-max-normal (SAT). `w8a8_mxfp8` uses the same format for the
+  weights, i.e. **FP8 weights**, matching the compressed-tensors `MXFP8` preset. It is not an
+  INT8-weight variant. The 8.25 bpw counts the E8M0 byte per 32. The test oracle is a verbatim
+  copy of `microsoft/microxcaling` `mx/mx_ops.py::_quantize_mx(..., "fp8_e4m3", block_size=32,
+  round="even")` @ `7bc4195` (MIT, `third_party/microxcaling_mx/`). It is bit-identical
+  (`torch.equal`) on CPU and CUDA on random, ±6-decade, heavy-tailed, zero, bf16, saturating
+  (block max in 448–512·2ᵏ) and RNE-tie inputs. Mutating emax to 7 fails both MXFP8 tests.
+- **INT4 per-token** (`a4_int4`): s = amax/7, round-half-even, clamp to [−7, 7]. This is
+  SmoothQuant's `quantize_activation_per_token_absmax(n_bits=4)` and is tested equal.
+- **Static per-tensor FP8** (`*_fp8_static`): s = max|x| over the calibration set / 448 per
+  linear (compressed-tensors `FP8` preset activations: `TENSOR`, `dynamic=False`,
+  `observer="static_minmax"`). The scale is fixed at evaluation time and values above 448·s
+  saturate; the saturated fraction is reported in `coverage.static_saturated_frac`.
+  Statistics come from the unquantized BF16 model (one shared pass for all modes), not
+  sequentially from the quantized model.
+- **Calibration set** (static FP8 and SmoothQuant): the first 32×512 = 16,384 tokens of
+  WikiText-2 **train** (`pytorch/examples`, the same repo as the test text, so it is disjoint
+  from evaluation), cut into 32 consecutive windows. Settings: `--calib-samples`,
+  `--calib-seqlen`. Upstream SmoothQuant uses 512 Pile samples; this set is smaller and from
+  the same domain as the test text.
+- **SmoothQuant** (`w8a8_int8_sq05`): Xiao et al., ICML'23,
+  [mit-han-lab/smoothquant](https://github.com/mit-han-lab/smoothquant) @ `c61476d`.
+  Calibration follows `get_act_scales` (per-input-channel max|x|). Scales follow
+  `smooth_ln_fcs_llama_like`: s_j = max|X_j|^α / max_fc max_i|W_fc[i,j]|^(1−α), with both
+  clamps at 1e-5. A test checks this against the verbatim upstream `smooth.py`
+  (`third_party/smoothquant_smooth.py`) on a `LlamaRMSNorm`. Quantization follows
+  `fake_quant.W8A8Linear` with `weight_quant="per_channel"` and `act_quant="per_token"`
+  (dynamic absmax/127), without BMM/KV quantization. Weights are quantized from the FP32
+  product W·s.
+
+SmoothQuant on Qwen3.5 module boundaries: where it was applied and where it was skipped.
+
+| Boundary | Consumers | Smoothed? | Why |
+|---|---|---|---|
+| full-attn `input_layernorm` | `q_proj` (q+gate), `k_proj`, `v_proj` | yes | norm output feeds only these |
+| GDN `input_layernorm` | `in_proj_qkv`, `in_proj_z`, `in_proj_b`, `in_proj_a` | yes (not with `--exclude-gdn`) | only `apply_mask_to_padding_states` (a per-token multiply, which commutes with per-channel scaling) sits in between |
+| `post_attention_layernorm` | `gate_proj`, `up_proj` | yes | as Llama |
+| `o_proj` input | attn·sigmoid(gate) | **no** | no preceding per-channel linear op to fold into (upstream skips it too) |
+| `down_proj` input | SiLU(gate)·up | **no** | no exact fold (upstream skips it too) |
+| GDN `out_proj` input | `RMSNormGated(core, z)` | **no** | its weight is per head_dim (128), shared by all 16 heads, so a per-channel 2048-wide scale cannot be folded exactly |
+| `lm_head` | final norm | **no** | lm_head is tied to the embedding and stays BF16 |
+
+Qwen3.5's RMSNorm is zero-centred, `rmsnorm(x)·(1+w)`, so the fold sets (1+w) ← (1+w)/s.
+This is exact algebra; `_check_zero_centered_rmsnorm` checks it at runtime and refuses any
+other norm type. Three checks back this up. The smoothed linears and the norm weight are kept
+in FP32. On a tiny random Qwen3.5 (GDN + full attention) the fold changes logits by less than
+1e-4. On the real model in FP32 the fold changes PPL by 2×10⁻⁷ relative (21.15658 →
+21.15658; one-off check, not in the JSON). The +0.10% of `sq05_bf16` in BF16 therefore comes
+only from re-rounding the unquantized W·s back to BF16, a cost the quantized modes do not
+pay. In total, 48 norms and 138 linears (359M weights, 72% of the replaced linears) are
+smoothed, with s ∈ [2.96, 25.1]. With `--exclude-gdn` the counts are 30 norms and 66 linears.
+
+Caveats: (1) This is simulation only. The FP8/MX rows assume perfect FP32 accumulation and
+dequantization, and no native kernel was run or timed. (2) Activation scales for dynamic modes
+are computed per call over a 512-token window. "Per-token" is exact per token, and MXFP8 is
+per 32 channels of each token. (3) GDN recurrent state, conv1d, the attention softmax/BMM and
+the KV cache stay BF16 in every mode. (4) Static scales and SmoothQuant use one fixed 16k-token
+in-domain calibration set, with no seed or sample-size sweep. α was not tuned (the task fixed
+it at 0.5). (5) The `w8a8_int8` and `w8a8_fp8` rows reproduce the earlier
+`advanced_4096.json` values exactly (21.477 / 21.291).
 
 ## MR-GPTQ (`mr_gptq/`)
 

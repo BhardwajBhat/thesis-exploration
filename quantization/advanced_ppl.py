@@ -33,6 +33,16 @@ Modes (W = weight format, A = activation format; blocks run along the K / input 
   w4_iq4nl_g32         GGUF IQ4_NL: kvalues_iq4nl, fp16 d = absmax/127 per 32, nearest code
   w3_bcq3_g128         BCQ / LUT-GEMM: sum of 3 greedy {-1,+1} planes x fp16 alpha + fp16 offset z
                        per row x 128 columns, fitted to the real weights (3.5 bpw)
+  Activation-quantization family (--modes act; see "Activation quantization" in README):
+  a8_fp8               A: FP8 E4M3 per-token dynamic (compressed-tensors FP8_DYNAMIC activations); W: BF16
+  a8_fp8_static        A: FP8 E4M3 per-tensor *static* scale = calib absmax/448 (static_minmax); W: BF16
+  w8a8_fp8_static      W: FP8 E4M3 per-output-channel; A: FP8 per-tensor static (calibrated)
+  a8_mxfp8             A: OCP MXFP8 E4M3, block 32 along K, E8M0 scale 2^(floor(log2 amax)-8); W: BF16
+  w8a8_mxfp8           W and A: OCP MXFP8 E4M3 block 32 (= compressed-tensors MXFP8 preset; FP8 weights)
+  a4_int4              A: INT4 symmetric per-token (qmax 7, SmoothQuant n_bits=4 rule); W: BF16
+  w8a8_int8_sq05       SmoothQuant (alpha 0.5) folded into Qwen3.5 RMSNorms, then W INT8 per-channel,
+                       A INT8 per-token dynamic (SmoothQuant fake_quant per_channel/per_token)
+  sq05_bf16            diagnostic: SmoothQuant fold only, no quantization (must equal bf16)
   mixed_nvfp4_fp8gdn   NVFP4 W4A4 on ordinary linears, FP8 W8A8 on linear_attn.* (GDN)
   w4a4_m2xfp           M2XFP (ASPLOS'26), port of official SJTU-ReArch-Group/M2XFP_ASPLOS26
                        quant_func.py: W = get_quant_mxes (Sg-EM-2bit adaptive scale),
@@ -50,6 +60,8 @@ import torch.nn.functional as F
 
 MODEL = "Qwen/Qwen3.5-0.8B"
 URL = "https://raw.githubusercontent.com/pytorch/examples/main/word_language_model/data/wikitext-2/test.txt"
+# Calibration text (disjoint from the evaluation text): same repo, WikiText-2 *train* split.
+CAL_URL = "https://raw.githubusercontent.com/pytorch/examples/main/word_language_model/data/wikitext-2/train.txt"
 GDN_RE = re.compile(r"(^|\.)linear_attn\.")
 
 FP8_MAX = 448.0          # E4M3FN max finite
@@ -110,10 +122,34 @@ def q_fp8_row(x):
     s = x.abs().amax(-1, keepdim=True).clamp_min(1e-12) / FP8_MAX
     return round_fp8_e4m3(x / s) * s
 
-def mx_scale_exp(amax):
-    """OCP MX scale exponent: floor(log2(amax)) - emax_elem (2 for E2M1), clamped to E8M0."""
-    e = torch.floor(torch.log2(amax.clamp_min(2.0 ** -127))) - 2
+def mx_scale_exp(amax, emax_elem=2):
+    """OCP MX v1.0 Sec. 6.3 scale exponent: floor(log2(amax)) - emax_elem, clamped to the E8M0
+    range [-127, 127]. emax_elem = exponent of the largest power of two in the element type:
+    2 for E2M1 (max 6), 8 for FP8 E4M3 (max 448 = 2^8 x 1.75)."""
+    e = torch.floor(torch.log2(amax.clamp_min(2.0 ** -127))) - emax_elem
     return e.clamp(-127, 127)
+
+FP8_E4M3_EMAX = 8
+
+def q_mxfp8(x, bs=32):
+    """OCP MXFP8 (E4M3 elements, block 32 along K, E8M0 power-of-two scale), OCP MX v1.0 Sec. 6.3:
+    X = 2^(floor(log2 amax_block) - 8), P_i = RNE_E4M3(V_i / X) with saturation to +-448.
+    amax/X lies in [256, 512), so the block max saturates when it exceeds 448 X (spec behaviour).
+    Matches microsoft/microxcaling _quantize_mx(..., "fp8_e4m3", block_size=32, round="even")
+    bit-exactly (QuantizerTests.test_mxfp8_matches_microxcaling)."""
+    xb, K = _blocks(x, bs)
+    s = torch.exp2(mx_scale_exp(xb.abs().amax(-1, keepdim=True), FP8_E4M3_EMAX))
+    return _unblock(round_fp8_e4m3(xb / s) * s, K)
+
+def q_int4_row(x):
+    """Symmetric INT4 per row (= per token for activations): s = absmax/7, round-half-even,
+    codes in [-7, 7] (SmoothQuant quantize_activation_per_token_absmax with n_bits=4)."""
+    s = x.abs().amax(-1, keepdim=True).clamp_min(1e-12) / 7.0
+    return (x / s).round().clamp(-7, 7) * s
+
+def q_fp8_static(x, scale):
+    """FP8 E4M3 with a fixed (calibrated) per-tensor scale: values beyond 448*scale saturate."""
+    return round_fp8_e4m3(x / scale) * scale
 
 def q_mxfp4(x, bs=32):
     xb, K = _blocks(x, bs)
@@ -492,7 +528,7 @@ def q_m2xfp_mxem(x, group_size=32):
     mask = torch.zeros_like(a).scatter_(1, top, 1).reshape(-1, group_size)
     return ((fp4 * (1 - mask) + fp6 * mask) * scales).reshape(shape)
 
-QUANT = {"int8": q_int8_row, "fp8": q_fp8_row, "mxfp4": q_mxfp4, "nvfp4": q_nvfp4, "nf4": q_nf4,
+QUANT = {"int8": q_int8_row, "fp8": q_fp8_row, "mxfp8": q_mxfp8, "int4": q_int4_row, "mxfp4": q_mxfp4, "nvfp4": q_nvfp4, "nf4": q_nf4,
          "m2xfp_mxes": q_m2xfp_mxes, "m2xfp_mxem": q_m2xfp_mxem,
          "nf3": q_nf3, "fp4_g32": lambda x: q_fp4_absmax(x, 32), "fp4_g64": lambda x: q_fp4_absmax(x, 64),
          "af4": q_af4, "bof4": q_bof4, "bof4s": q_bof4s, "apot4": q_apot4,
@@ -502,7 +538,7 @@ QUANT = {"int8": q_int8_row, "fp8": q_fp8_row, "mxfp4": q_mxfp4, "nvfp4": q_nvfp
 # m2xfp 4.5 (E8M0 scale + 8 bits metadata per 32: 4 x 2-bit subgroup codes)
 # Weight bits/element for coverage reporting (scale overhead counted as FP32 per group, LUT
 # entries as 16 bit; per-row LUT depends on K so it is computed per module in nominal_bpw).
-W_BPW = {"int8": 8.0, "fp8": 8.0, "mxfp4": 4.25, "nvfp4": 4.5, "nf4": 4.5, "m2xfp_mxes": 4.5,
+W_BPW = {"int8": 8.0, "fp8": 8.0, "mxfp8": 8.25, "mxfp4": 4.25, "nvfp4": 4.5, "nf4": 4.5, "m2xfp_mxes": 4.5,
          "nf3": 3.5, "fp4_g32": 5.0, "fp4_g64": 4.5, "af4": 4.5, "bof4": 4.5,
          "bof4s": 4.5,   # + 1 sign bit/block if the scale format has no sign (paper Sec. 6)
          "apot4": 4.5, "lut4_bof4fit": 4.5, "lut4_lloyd_g64": 8.0, "lut4_lloyd_row": None,
@@ -540,15 +576,36 @@ LUT_MODES = [m for m in MODES if m not in LEGACY_MODES]
 for _m, _f in [("w4_iq4nl_g32", "iq4nl"), ("w3_bcq3_g128", "bcq3_g128")]:
     MODES[_m] = {"default": (_f, None), "gdn": (_f, None)}
 ASIC_MODES = ["w4_iq4nl_g32", "w3_bcq3_g128"]
+# Activation-quantization family. "fp8_static" is a per-tensor static scale needing calibration;
+# "smooth" = SmoothQuant migration strength alpha (fold applied before quantization).
+STATIC_AFMTS = {"fp8_static"}
+for _m, _w, _a, _x in [("a8_fp8", None, "fp8", {}), ("a8_fp8_static", None, "fp8_static", {}),
+                       ("w8a8_fp8_static", "fp8", "fp8_static", {}), ("a8_mxfp8", None, "mxfp8", {}),
+                       ("w8a8_mxfp8", "mxfp8", "mxfp8", {}), ("a4_int4", None, "int4", {}),
+                       ("w8a8_int8_sq05", "int8", "int8", {"smooth": 0.5}),
+                       ("sq05_bf16", None, None, {"smooth": 0.5})]:
+    MODES[_m] = {"default": (_w, _a), "gdn": (_w, _a), **_x}
+ACT_MODES = ["bf16", "a8_int8", "a8_fp8", "a8_fp8_static", "a8_mxfp8", "a4_int4", "w8a8_int8",
+             "sq05_bf16", "w8a8_int8_sq05", "w8a8_fp8", "w8a8_fp8_static", "w8a8_mxfp8"]
+
+def needs_calibration(mode):
+    s = MODES[mode]
+    return "smooth" in s or any(v[1] in STATIC_AFMTS for k, v in s.items() if k in ("default", "gdn"))
 
 # ----------------------------------------------------------------------------- module replacement
 
 class QLinear(nn.Module):
     """Drop-in nn.Linear replacement: fake-quant weight once, fake-quant input per call."""
-    def __init__(self, lin: nn.Linear, wfmt, afmt, compute_dtype=None):
+    def __init__(self, lin: nn.Linear, wfmt, afmt, compute_dtype=None, a_scale=None):
         super().__init__()
         self.in_features, self.out_features = lin.in_features, lin.out_features
         self.wfmt, self.afmt = wfmt, afmt
+        if afmt in STATIC_AFMTS:
+            if a_scale is None or not a_scale > 0:
+                raise ValueError(f"{afmt} needs a positive calibrated scale")
+            self.a_scale = float(a_scale)
+        self.a_clipped = 0      # static formats: #elements with |x| > 448 * scale (saturated)
+        self.a_elems = 0
         self.compute_dtype = compute_dtype or lin.weight.dtype
         with torch.no_grad():
             w = lin.weight.detach().float()
@@ -569,7 +626,12 @@ class QLinear(nn.Module):
     def forward(self, x):
         self.calls += 1
         dt = x.dtype
-        if self.afmt:
+        if self.afmt in STATIC_AFMTS:
+            xf = x.float()
+            self.a_clipped += (xf.abs() > FP8_MAX * self.a_scale).sum()
+            self.a_elems += xf.numel()
+            x = q_fp8_static(xf, self.a_scale)
+        elif self.afmt:
             x = QUANT[self.afmt](x.float())
         y = F.linear(x.to(self.compute_dtype), self.weight, self.bias)
         return y.to(dt)
@@ -580,8 +642,9 @@ class QLinear(nn.Module):
 def is_gdn(name):
     return bool(GDN_RE.search(name))
 
-def apply_mode(model, mode, exclude_gdn=False, include_lm_head=False, compute_dtype=None):
-    """Replace linears in-place. Returns coverage dict."""
+def apply_mode(model, mode, exclude_gdn=False, include_lm_head=False, compute_dtype=None, calib=None):
+    """Replace linears in-place. Returns coverage dict. calib: {linear name: per-input-channel
+    absmax} from calibrate(), required by static activation formats."""
     spec = MODES[mode]
     total_params = sum(p.numel() for p in {id(p): p for p in model.parameters()}.values())
     linears = [(n, m) for n, m in model.named_modules() if isinstance(m, nn.Linear)]
@@ -604,7 +667,13 @@ def apply_mode(model, mode, exclude_gdn=False, include_lm_head=False, compute_dt
             continue
         parent_name, _, child = name.rpartition(".")
         parent = model.get_submodule(parent_name) if parent_name else model
-        ql = QLinear(lin, wfmt, afmt, compute_dtype)
+        a_scale = None
+        if afmt in STATIC_AFMTS:
+            if calib is None or name not in calib:
+                raise ValueError(f"{mode}: no calibration statistics for {name}")
+            a_scale = calib[name].max().item() / FP8_MAX        # static_minmax: absmax / 448
+            cov.setdefault("static_scales", {})[name] = a_scale
+        ql = QLinear(lin, wfmt, afmt, compute_dtype, a_scale)
         setattr(parent, child, ql)
         n = lin.weight.numel()
         key = f"W={wfmt or 'bf16'},A={afmt or 'bf16'}"
@@ -631,6 +700,112 @@ def _finish_cov(c):
         del c["w_err_sq_by_format"], c["w_sq_by_format"]
     return c
 
+# ----------------------------------------------------------------------------- calibration / SmoothQuant
+
+_CAL_TEXT = None
+def calibration_ids(tok, samples=32, seqlen=512):
+    """Fixed calibration set: the first samples*seqlen tokenizer tokens of WikiText-2 *train*
+    (pytorch/examples), cut into consecutive seqlen windows. Disjoint from the test text."""
+    global _CAL_TEXT
+    if _CAL_TEXT is None:
+        _CAL_TEXT = urllib.request.urlopen(CAL_URL).read().decode()
+    ids = tok(_CAL_TEXT[:4_000_000], return_tensors="pt", add_special_tokens=False).input_ids[0]
+    assert len(ids) >= samples * seqlen
+    return ids[:samples * seqlen].view(samples, seqlen)
+
+@torch.no_grad()
+def calibrate(model, batches):
+    """Per-input-channel max |x| of every nn.Linear input over the calibration batches
+    (SmoothQuant calibration.get_act_scales; its max is also the static_minmax per-tensor
+    absmax). Run on the unquantized model. Returns {name: FP32 CPU tensor [in_features]}."""
+    stats, hooks = {}, []
+    def hook(name):
+        def f(m, inp):
+            x = inp[0].detach().reshape(-1, inp[0].shape[-1]).abs().amax(0).float()
+            stats[name] = x if name not in stats else torch.maximum(stats[name], x)
+        return f
+    for n, m in model.named_modules():
+        if isinstance(m, nn.Linear):
+            hooks.append(m.register_forward_pre_hook(hook(n)))
+    dev = next(model.parameters()).device
+    try:
+        for b in batches:
+            model(b.view(1, -1).to(dev), use_cache=False, logits_to_keep=1)
+    finally:
+        for h in hooks:
+            h.remove()
+    return {k: v.cpu() for k, v in stats.items()}
+
+def smoothquant_scales(act_amax, weights, alpha=0.5):
+    """SmoothQuant smooth_ln_fcs_llama_like (mit-han-lab/smoothquant @c61476d smooth.py):
+    s_j = clamp(max|X_j|^alpha / max_i(max_fc |W_fc[:, j]|)^(1-alpha), min=1e-5),
+    weight max clamped to >= 1e-5. Computed in FP32 (upstream: model dtype)."""
+    w = torch.stack([W.detach().float().abs().amax(0) for W in weights]).amax(0).clamp(min=1e-5)
+    a = act_amax.to(w.device).float()
+    return (a.pow(alpha) / w.pow(1 - alpha)).clamp(min=1e-5)
+
+def _check_zero_centered_rmsnorm(norm):
+    """Fold safety: the norm must compute rmsnorm(x) * (1 + weight) per channel (Qwen3_5RMSNorm),
+    so dividing (1 + weight) by s divides its output channels by s exactly."""
+    if type(norm).__name__ != "Qwen3_5RMSNorm":
+        raise TypeError(f"refusing to fold into {type(norm).__name__}")
+    x = torch.randn(3, norm.weight.numel(), device=norm.weight.device)
+    ref = x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + norm.eps) * (1.0 + norm.weight.float())
+    if not torch.allclose(norm(x).float(), ref, rtol=1e-5, atol=1e-5):
+        raise RuntimeError("norm is not rmsnorm(x)*(1+w); SmoothQuant fold unsafe")
+
+def smoothquant_groups(model, exclude_gdn=False):
+    """Qwen3.5 boundaries where the SmoothQuant fold is exact: a Qwen3_5RMSNorm whose output feeds
+    only the listed linears (verified against modeling_qwen3_5.py, transformers 5.x):
+      full attention: input_layernorm          -> self_attn.{q,k,v}_proj
+      GDN:            input_layernorm          -> linear_attn.in_proj_{qkv,z,b,a}
+                      (through apply_mask_to_padding_states, a per-token multiply, which commutes)
+      all layers:     post_attention_layernorm -> mlp.{gate,up}_proj
+    Not smoothed (no exact fold): o_proj (input = attention x sigmoid(gate)), mlp.down_proj
+    (SiLU(gate) x up), GDN out_proj (input = RMSNormGated whose weight is per head_dim, shared by
+    all heads), lm_head (tied to the embedding). Upstream SmoothQuant also leaves o/down unsmoothed."""
+    groups = []
+    for name, layer in model.named_modules():
+        if not (hasattr(layer, "input_layernorm") and hasattr(layer, "post_attention_layernorm")):
+            continue
+        if hasattr(layer, "self_attn"):
+            a = layer.self_attn
+            groups.append((f"{name}.input_layernorm", layer.input_layernorm,
+                           [(f"{name}.self_attn.{p}", getattr(a, p)) for p in ("q_proj", "k_proj", "v_proj")]))
+        elif hasattr(layer, "linear_attn"):
+            if not exclude_gdn:
+                g = layer.linear_attn
+                groups.append((f"{name}.input_layernorm", layer.input_layernorm,
+                               [(f"{name}.linear_attn.{p}", getattr(g, p))
+                                for p in ("in_proj_qkv", "in_proj_z", "in_proj_b", "in_proj_a")]))
+        else:
+            raise RuntimeError(f"unknown token mixer in {name}")
+        groups.append((f"{name}.post_attention_layernorm", layer.post_attention_layernorm,
+                       [(f"{name}.mlp.{p}", getattr(layer.mlp, p)) for p in ("gate_proj", "up_proj")]))
+    return groups
+
+@torch.no_grad()
+def apply_smoothquant(model, act_amax, alpha=0.5, exclude_gdn=False):
+    """Fold SmoothQuant per-channel scales: norm (1+w) /= s, consumer W[:, j] *= s_j.
+    Norm weight and smoothed linear weights become FP32 parameters (the norm computes in FP32
+    anyway; QLinear quantizes from the FP32 product), so the fold adds no BF16 rounding of W."""
+    info = {"alpha": alpha, "norms": 0, "linears": [], "scale_min": math.inf, "scale_max": 0.0}
+    for nname, norm, fcs in smoothquant_groups(model, exclude_gdn):
+        _check_zero_centered_rmsnorm(norm)
+        a = act_amax[fcs[0][0]]
+        for n, fc in fcs:   # all consumers see the identical tensor -> identical statistics
+            assert isinstance(fc, nn.Linear) and fc.in_features == norm.weight.numel() == a.numel(), n
+            assert torch.equal(act_amax[n], a), f"{n} does not share {nname}'s output"
+        s = smoothquant_scales(a, [fc.weight for _, fc in fcs], alpha)
+        norm.weight = nn.Parameter((1.0 + norm.weight.float()) / s - 1.0, requires_grad=False)
+        for n, fc in fcs:
+            fc.weight = nn.Parameter(fc.weight.float() * s.view(1, -1), requires_grad=False)
+            info["linears"].append(n)
+        info["norms"] += 1
+        info["scale_min"] = min(info["scale_min"], s.min().item())
+        info["scale_max"] = max(info["scale_max"], s.max().item())
+    return info
+
 # ----------------------------------------------------------------------------- evaluation
 
 _TEXT = None
@@ -652,9 +827,10 @@ def eval_ppl(model, tok, tokens=4096, seqlen=512, device="cuda"):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--modes", nargs="+", default=LEGACY_MODES, choices=list(MODES) + ["lut", "asic"],
+    ap.add_argument("--modes", nargs="+", default=LEGACY_MODES, choices=list(MODES) + ["lut", "asic", "act"],
                     help="'lut' expands to the weight-only LUT/codebook family incl. bf16 and w4_nf4_g64; "
-                         "'asic' to bf16 + the isa_sim-verified IQ4_NL / BCQ modes")
+                         "'asic' to bf16 + the isa_sim-verified IQ4_NL / BCQ modes; "
+                         "'act' to the activation-quantization comparison set")
     ap.add_argument("--tokens", type=int, default=4096)
     ap.add_argument("--seqlen", type=int, default=512)
     ap.add_argument("--exclude-gdn", action="store_true", help="leave linear_attn.* (GDN) linears BF16")
@@ -662,6 +838,9 @@ def main():
                     help="also quantize lm_head (own copy; tied embedding stays BF16)")
     ap.add_argument("--compute-dtype", choices=["bf16", "fp32"], default="bf16",
                     help="dtype of dequantized W/A fed to the matmul in QLinear")
+    ap.add_argument("--calib-samples", type=int, default=32,
+                    help="calibration windows (WikiText-2 train) for static scales / SmoothQuant")
+    ap.add_argument("--calib-seqlen", type=int, default=512)
     ap.add_argument("--output", default="advanced_ppl_results.json")
     ap.add_argument("--self-test", action="store_true", help="run quantizer unit tests (CPU) and exit")
     a = ap.parse_args()
@@ -669,7 +848,7 @@ def main():
         sys.exit(run_self_tests())
     modes = []
     for m in a.modes:
-        exp = {"lut": ["bf16", "w4_nf4_g64"] + LUT_MODES, "asic": ["bf16"] + ASIC_MODES}
+        exp = {"lut": ["bf16", "w4_nf4_g64"] + LUT_MODES, "asic": ["bf16"] + ASIC_MODES, "act": ACT_MODES}
         for x in exp.get(m, [m]):
             if x not in modes:
                 modes.append(x)
@@ -684,17 +863,45 @@ def main():
            "options": {"exclude_gdn": a.exclude_gdn, "include_lm_head": a.include_lm_head,
                        "compute_dtype": a.compute_dtype},
            "results": {}}
+    load = lambda: AutoModelForCausalLM.from_pretrained(MODEL, dtype=torch.bfloat16,
+                                                         attn_implementation="sdpa").cuda().eval()
+    calib = None
+    if any(needs_calibration(x) for x in a.modes):
+        t = time.time(); m = load()
+        calib = calibrate(m, calibration_ids(tok, a.calib_samples, a.calib_seqlen))
+        del m
+        res["calibration"] = {"dataset": CAL_URL, "samples": a.calib_samples, "seqlen": a.calib_seqlen,
+                              "tokens": a.calib_samples * a.calib_seqlen, "model": "BF16 (unquantized)",
+                              "statistic": "per-input-channel max |x| per nn.Linear",
+                              "seconds": time.time() - t}
     for mode in a.modes:
         torch.cuda.empty_cache(); t = time.time()
-        m = AutoModelForCausalLM.from_pretrained(MODEL, dtype=torch.bfloat16, attn_implementation="sdpa").cuda().eval()
-        cov = apply_mode(m, mode, a.exclude_gdn, a.include_lm_head, cdt)
+        m = load()
+        sq = None
+        if "smooth" in MODES[mode]:
+            sq = apply_smoothquant(m, calib, MODES[mode]["smooth"], a.exclude_gdn)
+        cov = apply_mode(m, mode, a.exclude_gdn, a.include_lm_head, cdt, calib)
+        for lin in m.modules():   # smoothed linears left un-replaced (sq05_bf16): store in BF16
+            if isinstance(lin, nn.Linear) and lin.weight.dtype != torch.bfloat16:
+                lin.to(torch.bfloat16)
+        if sq is not None:
+            cov["smoothquant"] = {k: v for k, v in sq.items() if k != "linears"} | {
+                "smoothed_linears": len(sq["linears"]),
+                "smoothed_params": sum(m.get_submodule(n).weight.numel() for n in sq["linears"])}
         try:
             nll, ppl, n = eval_ppl(m, tok, a.tokens, a.seqlen)
             r = {"nll": nll, "ppl": ppl, "tokens": n}
         except RuntimeError as e:
             r = {"nll": None, "ppl": None, "error": str(e)}
-        calls = [q.calls for q in m.modules() if isinstance(q, QLinear)]
-        r.update(spec={k: list(v) for k, v in MODES[mode].items()}, coverage=cov,
+        qls = [q for q in m.modules() if isinstance(q, QLinear)]
+        calls = [q.calls for q in qls]
+        st = [q for q in qls if q.afmt in STATIC_AFMTS]
+        if st:
+            cov["static_saturated_frac"] = float(sum(q.a_clipped for q in st)) / max(sum(q.a_elems for q in st), 1)
+            cov.pop("static_scales", None)
+            cov["static_scale_range"] = [min(q.a_scale for q in st), max(q.a_scale for q in st)]
+        r.update(spec={k: (list(v) if isinstance(v, tuple) else v) for k, v in MODES[mode].items()},
+                 coverage=cov,
                  qlinear_modules=len(calls), qlinear_min_calls=min(calls) if calls else 0,
                  seconds=time.time() - t)
         res["results"][mode] = r
@@ -1203,6 +1410,203 @@ class QuantizerTests(unittest.TestCase):
         w = q_m2xfp_mxes(torch.randn(32, 256)); a = q_m2xfp_mxem(torch.randn(32, 256))
         self.assertTrue(torch.equal(w.bfloat16().float(), w))
         self.assertTrue(torch.equal(a.bfloat16().float(), a))
+    # ---------------------------------------------------------------- activation-quant family
+    @staticmethod
+    def _mx_oracle():
+        """Verbatim microsoft/microxcaling mx/ (third_party/microxcaling_mx, MIT) as test oracle."""
+        import importlib, pathlib
+        d = str(pathlib.Path(__file__).resolve().parent / "third_party")
+        if d not in sys.path:
+            sys.path.insert(0, d)
+        return importlib.import_module("microxcaling_mx.mx_ops")
+
+    def test_mxfp8_matches_microxcaling(self):
+        mx = self._mx_oracle()
+        g = torch.Generator().manual_seed(3)
+        xs = [torch.randn(4, 128, generator=g),
+              torch.randn(3, 96, generator=g) * torch.logspace(-6, 6, 96),
+              torch.randn(2, 5, 64, generator=g).pow(3) * 30,
+              torch.zeros(2, 32),
+              torch.randn(8, 1024, generator=g).bfloat16().float(),
+              # block maxima in (448, 512) x 2^k -> saturation path; exact E4M3 midpoints -> RNE ties
+              torch.tensor([[500.0, 17.0, 19.0, -9.0, 0.0078125 * 1.5625] + [1.0] * 27]) * 2.0 ** torch.arange(-4, 4).view(-1, 1)]
+        for x in xs:
+            ref = mx._quantize_mx(x.clone(), 8, "fp8_e4m3", axes=[-1], block_size=32, round="even")
+            self.assertTrue(torch.equal(q_mxfp8(x), ref), tuple(x.shape))
+        if torch.cuda.is_available():
+            x = torch.randn(16, 3584, device="cuda") * 3
+            ref = mx._quantize_mx(x.clone(), 8, "fp8_e4m3", axes=[-1], block_size=32, round="even")
+            self.assertTrue(torch.equal(q_mxfp8(x), ref))
+
+    def test_mxfp8_spec_properties(self):
+        x = torch.randn(6, 256) * torch.logspace(-3, 3, 256)
+        xb, _ = _blocks(x, 32); qb, _ = _blocks(q_mxfp8(x), 32)
+        amax = xb.abs().amax(-1, keepdim=True)
+        X = torch.exp2(mx_scale_exp(amax, 8))
+        self.assertTrue(torch.equal(torch.log2(X), torch.log2(X).round()))        # E8M0 power of two
+        r = amax / X
+        self.assertTrue(((r >= 256) & (r < 512)).all())                            # OCP 6.3 step 1
+        e = qb / X
+        self.assertTrue(torch.equal(e, round_fp8_e4m3(e)))                         # elements on E4M3
+        self.assertLessEqual(e.abs().max().item(), 448.0)
+        # handworked: amax 500 -> X = 2^(8-8) = 1; 500 saturates to 448; 17 -> 16 (RNE), 19 -> 20
+        q = q_mxfp8(torch.tensor([[500.0, 17.0, 19.0, -0.3] + [0.0] * 28]))
+        self.assertEqual(q[0, :3].tolist(), [448.0, 16.0, 20.0])
+        self.assertEqual(q[0, 3].item(), round_fp8_e4m3(torch.tensor(-0.3)).item())
+        # amax 1 -> X = 2^-8, so the block max maps to 256 (not 448: power-of-two scale headroom)
+        q = q_mxfp8(torch.tensor([[1.0, 0.001] + [0.0] * 30]))
+        self.assertEqual(q[0, 0].item(), 1.0)
+        self.assertTrue(torch.equal(q_mxfp8(torch.zeros(1, 64)), torch.zeros(1, 64)))
+        self.assertEqual(q_mxfp8(torch.randn(3, 40)).shape, (3, 40))               # padding path
+        # per-block scaling beats per-token FP8 when one outlier channel pushes the per-token scale
+        # so far that ordinary values fall into E4M3 subnormals (|x|/s < 2^-6)
+        y = torch.randn(4, 1024); y[:, 7] = 1e5
+        err = lambda f: (f(y) - y)[:, 32:].pow(2).sum().item()
+        self.assertLess(err(q_mxfp8), err(q_fp8_row))
+
+    def test_int4_row(self):
+        x = torch.randn(16, 128)
+        q = q_int4_row(x)
+        s = x.abs().amax(-1, keepdim=True) / 7
+        c = q / s
+        self.assertTrue(torch.allclose(c, c.round(), atol=1e-5))
+        self.assertLessEqual(c.abs().max().item(), 7 + 1e-5)
+        self.assertLessEqual(len(c[0].round().unique()), 15)
+        self.assertTrue(((q - x).abs() <= s / 2 + 1e-6).all())
+        # identical to SmoothQuant's quantize_activation_per_token_absmax(n_bits=4) (clamp_min 1e-5)
+        sq = x.abs().amax(-1, keepdim=True).clamp(min=1e-5) / (2 ** 3 - 1)
+        self.assertTrue(torch.equal(q, (x / sq).round() * sq))
+        self.assertTrue(torch.equal(q_int4_row(torch.zeros(2, 8)), torch.zeros(2, 8)))
+
+    def test_fp8_static(self):
+        x = torch.tensor([[1.0, -2.0, 0.3, 10.0]])
+        q = q_fp8_static(x, 2.0 / 448)                          # calibrated absmax 2 -> 10 saturates
+        self.assertEqual(q[0, :2].tolist(), [1.0, -2.0])
+        self.assertAlmostEqual(q[0, 3].item(), 2.0, places=6)
+        lin = nn.Linear(4, 3, bias=False)
+        self.assertRaises(ValueError, QLinear, lin, None, "fp8_static", torch.float32)
+        ql = QLinear(lin, None, "fp8_static", torch.float32, a_scale=2.0 / 448)
+        self.assertTrue(torch.allclose(ql(x), F.linear(q, lin.weight), atol=1e-6))
+        self.assertEqual(int(ql.a_clipped), 1); self.assertEqual(ql.a_elems, 4)
+        # static scale never adapts: a scaled-down call loses resolution vs per-token dynamic
+        y = torch.randn(8, 64) * 1e-3
+        e_st = (q_fp8_static(y, 1.0 / 448) - y).pow(2).sum(); e_dy = (q_fp8_row(y) - y).pow(2).sum()
+        self.assertGreater(e_st.item(), e_dy.item())
+
+    def _tiny_qwen(self, dtype=torch.float32):
+        from transformers import Qwen3_5TextConfig
+        from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5ForCausalLM
+        c = Qwen3_5TextConfig(vocab_size=96, hidden_size=64, intermediate_size=128, num_hidden_layers=2,
+                              layer_types=["linear_attention", "full_attention"], num_attention_heads=2,
+                              num_key_value_heads=1, head_dim=32, linear_num_key_heads=2,
+                              linear_num_value_heads=2, linear_key_head_dim=16, linear_value_head_dim=16)
+        torch.manual_seed(0)
+        m = Qwen3_5ForCausalLM(c).eval().to(dtype)
+        with torch.no_grad():
+            for n, p in m.named_parameters():
+                if n.endswith("layernorm.weight"):
+                    p.normal_(0, 0.3)            # non-trivial zero-centred norm gains
+            m.model.layers[0].post_attention_layernorm.weight[5] = 29.0   # activation outlier channel
+        return m
+
+    def test_smoothquant_scales_match_upstream(self):
+        """Our scale == upstream smooth_ln_fcs_llama_like (third_party/smoothquant_smooth.py, verbatim
+        mit-han-lab/smoothquant @c61476d), recovered from what it does to a LlamaRMSNorm of ones."""
+        import importlib.util, pathlib
+        p = pathlib.Path(__file__).resolve().parent / "third_party" / "smoothquant_smooth.py"
+        spec = importlib.util.spec_from_file_location("sq_smooth", p)
+        sq = importlib.util.module_from_spec(spec); spec.loader.exec_module(sq)
+        from transformers.models.llama.modeling_llama import LlamaRMSNorm
+        g = torch.Generator().manual_seed(5)
+        act = torch.rand(48, generator=g) * 20; act[3] = 0.0
+        fcs = [nn.Linear(48, n, bias=False) for n in (32, 16)]
+        with torch.no_grad():
+            fcs[1].weight[:, 7] = 0.0; fcs[0].weight[:, 7] = 0.0                    # clamp path
+        W0 = [fc.weight.detach().clone() for fc in fcs]
+        for alpha in (0.5, 0.8):
+            ln = LlamaRMSNorm(48)
+            for fc, w in zip(fcs, W0):
+                fc.weight.data.copy_(w)
+            ours = smoothquant_scales(act, W0, alpha)
+            sq.smooth_ln_fcs_llama_like(ln, fcs, act.clone(), alpha)
+            self.assertTrue(torch.allclose(1.0 / ln.weight.detach(), ours, rtol=1e-6))
+            self.assertTrue(torch.allclose(fcs[0].weight, W0[0] * ours, rtol=1e-6))
+
+    def test_smoothquant_fold_is_exact_on_qwen35(self):
+        m = self._tiny_qwen()
+        ids = torch.randint(0, 96, (3, 24), generator=torch.Generator().manual_seed(1))
+        with torch.no_grad():
+            ref = m(ids[:1], use_cache=False).logits
+        cal = calibrate(m, ids)
+        names = [n for n, x in m.named_modules() if isinstance(x, nn.Linear)]
+        self.assertEqual(set(cal), set(names))
+        groups = smoothquant_groups(m)
+        sm = {n for _, _, fcs in groups for n, _ in fcs}
+        self.assertEqual(sm, {"model.layers.0.linear_attn." + p for p in ("in_proj_qkv", "in_proj_z", "in_proj_b", "in_proj_a")}
+                         | {f"model.layers.{i}.mlp.{p}" for i in (0, 1) for p in ("gate_proj", "up_proj")}
+                         | {"model.layers.1.self_attn." + p for p in ("q_proj", "k_proj", "v_proj")})
+        for n in ("model.layers.0.linear_attn.out_proj", "model.layers.1.self_attn.o_proj",
+                  "model.layers.0.mlp.down_proj", "lm_head"):
+            self.assertNotIn(n, sm)
+        info = apply_smoothquant(m, cal, 0.5)
+        self.assertEqual(info["norms"], 4); self.assertEqual(len(info["linears"]), 11)
+        self.assertGreater(info["scale_max"] / info["scale_min"], 2)                # really rescales
+        with torch.no_grad():
+            out = m(ids[:1], use_cache=False).logits
+        self.assertTrue(torch.allclose(out, ref, atol=1e-4, rtol=1e-4), (out - ref).abs().max())
+        # smoothing flattens the outlier channel of the smoothed activations
+        cal2 = calibrate(m, ids)
+        a0, a1 = cal["model.layers.0.mlp.gate_proj"], cal2["model.layers.0.mlp.gate_proj"]
+        self.assertLess((a1.max() / a1.median()).item(), (a0.max() / a0.median()).item())
+        # exclude_gdn leaves the GDN input norm (and so GDN in_proj inputs) untouched
+        m2 = self._tiny_qwen(); w = m2.model.layers[0].input_layernorm.weight.clone()
+        info = apply_smoothquant(m2, calibrate(m2, ids), 0.5, exclude_gdn=True)
+        self.assertEqual(info["norms"], 3)
+        self.assertTrue(torch.equal(m2.model.layers[0].input_layernorm.weight, w))
+        self.assertFalse(any("linear_attn" in n for n in info["linears"]))
+        # refuses a norm that is not rmsnorm(x) * (1 + w)
+        from transformers.models.llama.modeling_llama import LlamaRMSNorm
+        self.assertRaises(TypeError, _check_zero_centered_rmsnorm, LlamaRMSNorm(8))
+
+    def test_smoothquant_w8a8_pipeline(self):
+        m = self._tiny_qwen()
+        ids = torch.randint(0, 96, (2, 24), generator=torch.Generator().manual_seed(2))
+        with torch.no_grad():
+            ref = m(ids[:1], use_cache=False).logits
+        cal = calibrate(m, ids)
+        apply_smoothquant(m, cal, 0.5)
+        cov = apply_mode(m, "w8a8_int8_sq05", compute_dtype=torch.float32, calib=cal)
+        self.assertEqual(cov["w_quant_modules"], 15)                               # all but lm_head
+        q = m.model.layers[1].mlp.gate_proj
+        self.assertIsInstance(q, QLinear); self.assertEqual((q.wfmt, q.afmt), ("int8", "int8"))
+        with torch.no_grad():
+            out = m(ids[:1], use_cache=False).logits
+        self.assertTrue(torch.isfinite(out).all())
+        self.assertLess(((out - ref).norm() / ref.norm()).item(), 0.1)
+
+    def test_act_modes_and_static_calibration(self):
+        for mname in ACT_MODES:
+            self.assertIn(mname, MODES)
+        self.assertEqual(MODES["a8_fp8"]["default"], (None, "fp8"))
+        self.assertEqual(MODES["a8_mxfp8"]["default"], (None, "mxfp8"))
+        self.assertEqual(MODES["w8a8_mxfp8"]["default"], ("mxfp8", "mxfp8"))
+        self.assertEqual(MODES["a4_int4"]["default"], (None, "int4"))
+        self.assertTrue(needs_calibration("a8_fp8_static") and needs_calibration("w8a8_int8_sq05"))
+        self.assertFalse(needs_calibration("a8_mxfp8"))
+        m = self._tiny_qwen()
+        self.assertRaises(ValueError, apply_mode, m, "a8_fp8_static")
+        ids = torch.randint(0, 96, (2, 16), generator=torch.Generator().manual_seed(4))
+        cal = calibrate(m, ids)
+        cov = apply_mode(m, "a8_fp8_static", exclude_gdn=True, compute_dtype=torch.float32, calib=cal)
+        self.assertEqual(cov["skipped"]["gdn"], 5); self.assertEqual(cov["w_quant_params"], 0)
+        # layer-0 MLP input is upstream of every quantized linear (GDN excluded) -> same as calibration
+        ql = m.model.layers[0].mlp.gate_proj
+        self.assertAlmostEqual(ql.a_scale, cal["model.layers.0.mlp.gate_proj"].max().item() / 448)
+        with torch.no_grad():
+            m(ids[:1], use_cache=False)
+        self.assertEqual(int(ql.a_clipped), 0)                     # calibration tokens never saturate
+        self.assertGreater(ql.a_elems, 0)
+        self.assertEqual(apply_mode(nn.Sequential(nn.Linear(64, 8)), "w8a8_mxfp8")["w_bpw_replaced"], 8.25)
 
 if __name__ == "__main__":
     main()

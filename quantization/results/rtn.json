@@ -1,0 +1,23 @@
+{
+  "bf16": {
+    "nll": 3.052476704120636,
+    "ppl": 21.167705698008312,
+    "tokens": 4096,
+    "seconds": 1.649559736251831,
+    "definition": "BF16"
+  },
+  "int8": {
+    "nll": 3.0576625764369965,
+    "ppl": 21.27776384408308,
+    "tokens": 4096,
+    "seconds": 1.1645219326019287,
+    "definition": "per-output-channel symmetric RTN, dequantized BF16 eval"
+  },
+  "int4": {
+    "nll": 3.7448570132255554,
+    "ppl": 42.30295802285345,
+    "tokens": 4096,
+    "seconds": 1.1371898651123047,
+    "definition": "per-output-channel symmetric RTN, dequantized BF16 eval"
+  }
+}

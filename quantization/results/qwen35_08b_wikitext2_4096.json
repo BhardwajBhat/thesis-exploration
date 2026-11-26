@@ -1,0 +1,15 @@
+{
+  "model": "Qwen/Qwen3.5-0.8B",
+  "dataset": "pytorch/examples word_language_model WikiText-2 test.txt",
+  "protocol": "first 4097 tokenizer tokens, 8 independent 512-token input windows, 4096 next-token predictions, FP32 cross entropy",
+  "results": {
+    "bf16": {"ppl": 21.1677056980, "nll": 3.0524767041},
+    "int8_rtn_per_output_channel": {"ppl": 21.2777638441, "nll": 3.0576625764},
+    "awq_int8": {"ppl": 21.2080040199, "nll": 3.0543786585, "checkpoint": "axteam/Qwen3.5-0.8B-AWQ-8bit"},
+    "fp8_dynamic": {"ppl": 21.2786433961, "nll": 3.0577039123, "checkpoint": "axteam/Qwen3.5-0.8B-FP8-dynamic"},
+    "int4_rtn_per_output_channel": {"ppl": 42.3029580229, "nll": 3.7448570132},
+    "awq_int4": {"ppl": 22.7817101004, "nll": 3.1259580255, "checkpoint": "axteam/Qwen3.5-0.8B-AWQ-4bit"},
+    "gptq_int4": {"ppl": 21.612, "nll": 3.073247, "checkpoint": "JW-Hubs/Qwen3.5-0.8B-W4A16-GPTQ", "hardware": "A100", "backend": "gptqmodel TorchLinear dequant"},
+    "nvfp4": {"ppl": null, "status": "invalid on RTX 4090 reference path: missing/unexpected checkpoint parameters and NaN logits"}
+  }
+}

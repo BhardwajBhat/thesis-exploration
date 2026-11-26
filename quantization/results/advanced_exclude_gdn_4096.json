@@ -1,0 +1,156 @@
+{
+  "model": "Qwen/Qwen3.5-0.8B",
+  "dataset": "https://raw.githubusercontent.com/pytorch/examples/main/word_language_model/data/wikitext-2/test.txt",
+  "protocol": "first 4097 tokenizer tokens, independent 512-token windows, 4096 next-token predictions, FP32 cross entropy",
+  "options": {
+    "exclude_gdn": true,
+    "include_lm_head": false,
+    "compute_dtype": "bf16"
+  },
+  "results": {
+    "w8a8_fp8": {
+      "nll": 3.0531498789787292,
+      "ppl": 21.181960062589358,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          "fp8",
+          "fp8"
+        ],
+        "gdn": [
+          "fp8",
+          "fp8"
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 308281344,
+        "a_quant_params": 308281344,
+        "w_quant_modules": 96,
+        "a_quant_modules": 96,
+        "by_format": {
+          "W=fp8,A=fp8": 308281344
+        },
+        "skipped": {
+          "gdn": 90,
+          "lm_head": 1
+        },
+        "w_quant_frac_of_linear": 0.4100061012812691,
+        "w_quant_frac_of_model": 0.40973445282767534,
+        "a_quant_frac_of_linear": 0.4100061012812691
+      },
+      "qlinear_modules": 96,
+      "qlinear_min_calls": 8,
+      "seconds": 1.6525490283966064
+    },
+    "w4a4_mxfp4": {
+      "nll": 3.2738369703292847,
+      "ppl": 26.41248910186428,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          "mxfp4",
+          "mxfp4"
+        ],
+        "gdn": [
+          "mxfp4",
+          "mxfp4"
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 308281344,
+        "a_quant_params": 308281344,
+        "w_quant_modules": 96,
+        "a_quant_modules": 96,
+        "by_format": {
+          "W=mxfp4,A=mxfp4": 308281344
+        },
+        "skipped": {
+          "gdn": 90,
+          "lm_head": 1
+        },
+        "w_quant_frac_of_linear": 0.4100061012812691,
+        "w_quant_frac_of_model": 0.40973445282767534,
+        "a_quant_frac_of_linear": 0.4100061012812691
+      },
+      "qlinear_modules": 96,
+      "qlinear_min_calls": 8,
+      "seconds": 1.2484207153320312
+    },
+    "w4a4_nvfp4": {
+      "nll": 3.181414246559143,
+      "ppl": 24.08078564975031,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          "nvfp4",
+          "nvfp4"
+        ],
+        "gdn": [
+          "nvfp4",
+          "nvfp4"
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 308281344,
+        "a_quant_params": 308281344,
+        "w_quant_modules": 96,
+        "a_quant_modules": 96,
+        "by_format": {
+          "W=nvfp4,A=nvfp4": 308281344
+        },
+        "skipped": {
+          "gdn": 90,
+          "lm_head": 1
+        },
+        "w_quant_frac_of_linear": 0.4100061012812691,
+        "w_quant_frac_of_model": 0.40973445282767534,
+        "a_quant_frac_of_linear": 0.4100061012812691
+      },
+      "qlinear_modules": 96,
+      "qlinear_min_calls": 8,
+      "seconds": 1.174067735671997
+    },
+    "w4_nf4_g64": {
+      "nll": 3.1183574199676514,
+      "ppl": 22.609211686197327,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          "nf4",
+          null
+        ],
+        "gdn": [
+          "nf4",
+          null
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 308281344,
+        "a_quant_params": 0,
+        "w_quant_modules": 96,
+        "a_quant_modules": 0,
+        "by_format": {
+          "W=nf4,A=bf16": 308281344
+        },
+        "skipped": {
+          "gdn": 90,
+          "lm_head": 1
+        },
+        "w_quant_frac_of_linear": 0.4100061012812691,
+        "w_quant_frac_of_model": 0.40973445282767534,
+        "a_quant_frac_of_linear": 0.0
+      },
+      "qlinear_modules": 96,
+      "qlinear_min_calls": 8,
+      "seconds": 1.0515592098236084
+    }
+  }
+}

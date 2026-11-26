@@ -1,0 +1,48 @@
+{
+  "model": "Qwen/Qwen3.5-0.8B",
+  "dataset": "https://raw.githubusercontent.com/pytorch/examples/main/word_language_model/data/wikitext-2/test.txt",
+  "protocol": "first 4097 tokenizer tokens, independent 512-token windows, 4096 next-token predictions, FP32 cross entropy",
+  "options": {
+    "exclude_gdn": true,
+    "include_lm_head": false,
+    "compute_dtype": "bf16"
+  },
+  "results": {
+    "w4a4_m2xfp": {
+      "nll": 3.204405128955841,
+      "ppl": 24.64083753499241,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          "m2xfp_mxes",
+          "m2xfp_mxem"
+        ],
+        "gdn": [
+          "m2xfp_mxes",
+          "m2xfp_mxem"
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 308281344,
+        "a_quant_params": 308281344,
+        "w_quant_modules": 96,
+        "a_quant_modules": 96,
+        "by_format": {
+          "W=m2xfp_mxes,A=m2xfp_mxem": 308281344
+        },
+        "skipped": {
+          "gdn": 90,
+          "lm_head": 1
+        },
+        "w_quant_frac_of_linear": 0.4100061012812691,
+        "w_quant_frac_of_model": 0.40973445282767534,
+        "a_quant_frac_of_linear": 0.4100061012812691
+      },
+      "qlinear_modules": 96,
+      "qlinear_min_calls": 8,
+      "seconds": 2.527070999145508
+    }
+  }
+}

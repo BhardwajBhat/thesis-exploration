@@ -38,8 +38,9 @@ the common harness; checkpoint rows use their authors' layer selection.
 | INT4 symmetric | 4/16 | per-row RTN | quantized | checkpoint harness | 42.303 | +99.85% | Sim |
 
 **Bottom line:** FP8 W8A8 is effectively lossless only when GDN projections
-remain BF16. For weight-only 4-bit, calibrated GPTQ is the clear winner. None of
-the tested W4A4 formats is close to lossless: MR-GPTQ improves MXFP4 strongly,
+remain BF16. For weight-only 4-bit, calibrated GPTQ is the clear winner; the
+best uncalibrated codebook is the refitted BOF4 LUT at +3.62%. None of the
+tested W4A4 formats is close to lossless: MR-GPTQ improves MXFP4 strongly,
 but its PPL is still 18.1% above BF16. On NVFP4, Hadamard rotation hurts
 (23.358 versus 22.649 without rotation), consistent across smoke and full runs.
 
@@ -104,9 +105,27 @@ RTN plus scale search only: no GPTQ or rotation. Full and GDN-excluded results a
 
 ### Weight-only LUT / codebook quantizers (activations BF16)
 
-No PPL has been measured for these yet (only self-tests have been run). Run them with
-`--modes lut` (expands to `bf16`, `w4_nf4_g64` and all modes below). The default `--modes`
-list is still the old 9 modes, and nothing in `results/` was changed.
+Run these with `--modes lut` (expands to `bf16`, `w4_nf4_g64` and all modes below).
+The 4,096-token results are in `results/lut_codebook_4096.json`.
+
+| Mode | Effective bpw | PPL | Δ vs BF16 | Weight relative MSE |
+|---|---:|---:|---:|---:|
+| `w4_lut4_bof4fit_g64` | 4.5 | **21.933** | **+3.62%** | 0.00800 |
+| `w4_bof4_g64` | 4.5 | 22.129 | +4.54% | 0.00804 |
+| `w4_lut4_lloyd_g64` | **8.0** | 22.124 | +4.52% | **0.00495** |
+| `w4_iq4nl_g32` | 4.5 | 22.609 | +6.81% | 0.0078 |
+| `w4_bof4s_g64` | 4.5 + sign metadata | 22.720 | +7.34% | 0.00774 |
+| `w4_apot4_g64` | 4.5 | 22.849 | +7.94% | 0.01063 |
+| `w4_fp4_g32` | 5.0 | 22.907 | +8.22% | 0.01022 |
+| `w4_fp4_g64` | 4.5 | 23.441 | +10.74% | 0.01131 |
+| `w4_nf4_g64` | 4.5 | 23.441 | +10.74% | 0.00872 |
+| `w4_lut4_lloyd_row` | 4.21 | 24.096 | +13.83% | 0.01092 |
+| `w4_af4_g64` | 4.5 | 24.422 | +15.38% | 0.00938 |
+| `w3_nf3_g64` | 3.5 | 36.285 | +71.42% | 0.04184 |
+| `w3_bcq3_g128` | 3.5 | 245.798 | +1061.19% | 0.0659 |
+
+The low-MSE per-group Lloyd row is not competitive once its 8 bpw table overhead is counted.
+Greedy BCQ is a failed baseline, not a bound on trained/refined LUT-GEMM.
 
 | Mode | Codebook / method | Scale | Nominal bpw | Source |
 |---|---|---|---:|---|

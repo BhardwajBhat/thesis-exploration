@@ -1,0 +1,133 @@
+{
+  "model": "Qwen/Qwen3.5-0.8B",
+  "dataset": "https://raw.githubusercontent.com/pytorch/examples/main/word_language_model/data/wikitext-2/test.txt",
+  "protocol": "first 4097 tokenizer tokens, independent 512-token windows, 4096 next-token predictions, FP32 cross entropy",
+  "options": {
+    "exclude_gdn": false,
+    "include_lm_head": false,
+    "compute_dtype": "bf16"
+  },
+  "results": {
+    "bf16": {
+      "nll": 3.052476704120636,
+      "ppl": 21.167705698008312,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          null,
+          null
+        ],
+        "gdn": [
+          null,
+          null
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 0,
+        "a_quant_params": 0,
+        "w_quant_modules": 0,
+        "a_quant_modules": 0,
+        "by_format": {},
+        "skipped": {
+          "all": 187
+        },
+        "modules_by_format": {},
+        "w_bits": 0.0,
+        "w_quant_frac_of_linear": 0.0,
+        "w_quant_frac_of_model": 0.0,
+        "a_quant_frac_of_linear": 0.0,
+        "w_bpw_replaced": null,
+        "w_rel_err_by_format": {}
+      },
+      "qlinear_modules": 0,
+      "qlinear_min_calls": 0,
+      "seconds": 1.8888087272644043
+    },
+    "w4_iq4nl_g32": {
+      "nll": 3.118367463350296,
+      "ppl": 22.609438760301877,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          "iq4nl",
+          null
+        ],
+        "gdn": [
+          "iq4nl",
+          null
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 497614848,
+        "a_quant_params": 0,
+        "w_quant_modules": 186,
+        "a_quant_modules": 0,
+        "by_format": {
+          "W=iq4nl,A=bf16": 497614848
+        },
+        "skipped": {
+          "lm_head": 1
+        },
+        "modules_by_format": {
+          "W=iq4nl,A=bf16": 186
+        },
+        "w_quant_frac_of_linear": 0.6618146953717423,
+        "w_quant_frac_of_model": 0.6613762118028357,
+        "a_quant_frac_of_linear": 0.0,
+        "w_bpw_replaced": 4.5,
+        "w_rel_err_by_format": {
+          "W=iq4nl,A=bf16": 0.007781043395029816
+        }
+      },
+      "qlinear_modules": 186,
+      "qlinear_min_calls": 8,
+      "seconds": 1.1671645641326904
+    },
+    "w3_bcq3_g128": {
+      "nll": 5.504509925842285,
+      "ppl": 245.79796692541228,
+      "tokens": 4096,
+      "spec": {
+        "default": [
+          "bcq3_g128",
+          null
+        ],
+        "gdn": [
+          "bcq3_g128",
+          null
+        ]
+      },
+      "coverage": {
+        "total_model_params": 752393024,
+        "linear_weight_params": 751894528,
+        "w_quant_params": 497614848,
+        "a_quant_params": 0,
+        "w_quant_modules": 186,
+        "a_quant_modules": 0,
+        "by_format": {
+          "W=bcq3_g128,A=bf16": 497614848
+        },
+        "skipped": {
+          "lm_head": 1
+        },
+        "modules_by_format": {
+          "W=bcq3_g128,A=bf16": 186
+        },
+        "w_quant_frac_of_linear": 0.6618146953717423,
+        "w_quant_frac_of_model": 0.6613762118028357,
+        "a_quant_frac_of_linear": 0.0,
+        "w_bpw_replaced": 3.5,
+        "w_rel_err_by_format": {
+          "W=bcq3_g128,A=bf16": 0.06590123877594356
+        }
+      },
+      "qlinear_modules": 186,
+      "qlinear_min_calls": 8,
+      "seconds": 1.3531744480133057
+    }
+  }
+}

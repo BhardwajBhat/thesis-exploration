@@ -29,6 +29,10 @@ Modes (W = weight format, A = activation format; blocks run along the K / input 
                        on this tensor's absmax-normalised g64 blocks, init = BOF4 codebook
   w4_lut4_lloyd_g64    per-group (64) own 16-entry Lloyd-Max LUT, BF16 entries (8 bpw!)
   w4_lut4_lloyd_row    per-output-row 16-entry Lloyd-Max LUT (SqueezeLLM-style, unweighted)
+  ASIC-verified weight-only formats (A: BF16; definitions from /home/bhat/asic/v2/isa_sim):
+  w4_iq4nl_g32         GGUF IQ4_NL: kvalues_iq4nl, fp16 d = absmax/127 per 32, nearest code
+  w3_bcq3_g128         BCQ / LUT-GEMM: sum of 3 greedy {-1,+1} planes x fp16 alpha + fp16 offset z
+                       per row x 128 columns, fitted to the real weights (3.5 bpw)
   mixed_nvfp4_fp8gdn   NVFP4 W4A4 on ordinary linears, FP8 W8A8 on linear_attn.* (GDN)
   w4a4_m2xfp           M2XFP (ASPLOS'26), port of official SJTU-ReArch-Group/M2XFP_ASPLOS26
                        quant_func.py: W = get_quant_mxes (Sg-EM-2bit adaptive scale),
@@ -324,6 +328,69 @@ def q_lut4_bof4fit(x, bs=64):
     c = lloyd_1d(xn.reshape(1, -1), BOF4_MSE_64_GRID.to(x.device).view(1, -1), w.reshape(1, -1))
     return _unblock(round_codebook(xn, c[0]) * s, K)
 
+# ----------------------------------------------------------------------------- ASIC-verified formats
+# Definitions taken from the local ASIC ISA simulator (/home/bhat/asic/v2/isa_sim, commit 2039157),
+# whose gen.py quantizers + ref.py dequantizers are the oracle in QuantizerTests.test_*_isa_sim_*.
+#
+# GGUF IQ4_NL: kvalues_iq4nl copied from isa_sim/ggml_tables.py (verbatim llama.cpp ggml-common.h).
+KVALUES_IQ4NL = [-127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113]
+IQ4NL_GRID = torch.tensor(KVALUES_IQ4NL, dtype=torch.float32)
+
+def iq4nl_encode(x, bs=32):
+    """isa_sim gen_iq4nl rule per block of 32: d = fp16(absmax / 127); code = nearest
+    KVALUES_IQ4NL entry to x / d (FP32 divide; exact midpoint ties -> lower code, = numpy argmin
+    first index); d == 0 -> codes 0. Returns (d [.., nb, 1] fp32 holding fp16 values, codes
+    [.., nb, bs] int64, K). Padding (K % 32) is zeros, which never raise the absmax."""
+    xb, K = _blocks(x.float(), bs)
+    d = (xb.abs().amax(-1, keepdim=True) / 127).half().float()
+    safe = torch.where(d > 0, d, torch.ones_like(d))
+    mids = (IQ4NL_GRID[1:] + IQ4NL_GRID[:-1]).to(x.device) / 2
+    codes = torch.where(d > 0, torch.bucketize(xb / safe, mids), torch.zeros_like(xb, dtype=torch.long))
+    return d, codes, K
+
+def q_iq4nl(x, bs=32):
+    """GGUF IQ4_NL fake-quant, dequant = f32(d) * f32(kvalues[code]) (isa_sim ref_iq4nl, which is
+    llama.cpp dequantize_row_iq4_nl). Caveat: llama.cpp's own quantize_row_iq4_nl uses a signed
+    max (d = max/-127) plus a 7-step scale search (+ optional imatrix); this is the plain
+    absmax/127 rule of the local generator. 4.5 bpw (4-bit codes + fp16 d per 32)."""
+    d, codes, K = iq4nl_encode(x, bs)
+    return _unblock(d * IQ4NL_GRID.to(x.device)[codes], K)
+
+def bcq_encode(x, g=128, k=3):
+    """Greedy k-plane BCQ with offset, fitted to x per row/group of g (isa_sim gen_bcq):
+      z = fp16(mean(blk)); res = blk - z;
+      for p in 0..k-1: b_p = (res >= 0); a_p = fp16(mean|res|); res -= a_p * (2 b_p - 1)
+    All fitting arithmetic in float64 (as gen.py does with numpy float64). Padded columns are
+    masked out of every mean. Returns (bits [k, .., G, g] bool, alpha [.., G, k] fp32-of-fp16,
+    z [.., G, 1] fp32-of-fp16, K)."""
+    xb, K = _blocks(x.double(), g)
+    m, _ = _blocks(torch.ones_like(x, dtype=torch.float64), g)
+    n = m.sum(-1, keepdim=True)
+    z = ((xb * m).sum(-1, keepdim=True) / n).half().double()
+    res = (xb - z) * m
+    bits, alpha = [], []
+    for _ in range(k):
+        b = res >= 0
+        a = ((res.abs() * m).sum(-1, keepdim=True) / n).half().double()
+        res = res - a * (2 * b.double() - 1)
+        bits.append(b); alpha.append(a)
+    return torch.stack(bits), torch.cat(alpha, -1).float(), z.float(), K
+
+def bcq_decode(bits, alpha, z, K):
+    """isa_sim ref_bcq 'kernel' (FP32 slow path): acc = sum_p (+-1)*a_p accumulated in FP32 in
+    plane order, then + z in FP32. Each torch op is a single IEEE FP32 RNE op -> bit-identical."""
+    acc = None
+    for p in range(bits.shape[0]):
+        t = torch.where(bits[p], 1.0, -1.0) * alpha[..., p:p + 1]
+        acc = t if acc is None else acc + t
+    return _unblock(acc + z, K)
+
+def q_bcq(x, g=128, k=3):
+    """BCQ / LUT-GEMM weight format: w ~= sum_{p<k} a_p b_p + z, b_p in {-1,+1}, per output row
+    and group of g input columns, fp16 a_p and z. Greedy residual fit (no alternating refinement).
+    3 planes, g128: 3 + (3+1)*16/128 = 3.5 bpw."""
+    return bcq_decode(*bcq_encode(x, g, k))
+
 # ----------------------------------------------------------------------------- M2XFP (exact port)
 # Port of mxq/quantize/quant_func.py from github.com/SJTU-ReArch-Group/M2XFP_ASPLOS26
 # @ 2ed16eb6 (MIT). Arithmetic is kept op-for-op identical to the official code (same FP32
@@ -429,7 +496,8 @@ QUANT = {"int8": q_int8_row, "fp8": q_fp8_row, "mxfp4": q_mxfp4, "nvfp4": q_nvfp
          "m2xfp_mxes": q_m2xfp_mxes, "m2xfp_mxem": q_m2xfp_mxem,
          "nf3": q_nf3, "fp4_g32": lambda x: q_fp4_absmax(x, 32), "fp4_g64": lambda x: q_fp4_absmax(x, 64),
          "af4": q_af4, "bof4": q_bof4, "bof4s": q_bof4s, "apot4": q_apot4,
-         "lut4_bof4fit": q_lut4_bof4fit, "lut4_lloyd_g64": q_lut4_lloyd, "lut4_lloyd_row": q_lut4_lloyd_row}
+         "lut4_bof4fit": q_lut4_bof4fit, "lut4_lloyd_g64": q_lut4_lloyd, "lut4_lloyd_row": q_lut4_lloyd_row,
+         "iq4nl": q_iq4nl, "bcq3_g128": q_bcq}
 # Nominal bits/weight incl. scale overhead: int8/fp8 ~8, mxfp4 4.25, nvfp4 4.5, nf4 g64 4.5 (fp32 absmax),
 # m2xfp 4.5 (E8M0 scale + 8 bits metadata per 32: 4 x 2-bit subgroup codes)
 # Weight bits/element for coverage reporting (scale overhead counted as FP32 per group, LUT
@@ -437,7 +505,9 @@ QUANT = {"int8": q_int8_row, "fp8": q_fp8_row, "mxfp4": q_mxfp4, "nvfp4": q_nvfp
 W_BPW = {"int8": 8.0, "fp8": 8.0, "mxfp4": 4.25, "nvfp4": 4.5, "nf4": 4.5, "m2xfp_mxes": 4.5,
          "nf3": 3.5, "fp4_g32": 5.0, "fp4_g64": 4.5, "af4": 4.5, "bof4": 4.5,
          "bof4s": 4.5,   # + 1 sign bit/block if the scale format has no sign (paper Sec. 6)
-         "apot4": 4.5, "lut4_bof4fit": 4.5, "lut4_lloyd_g64": 8.0, "lut4_lloyd_row": None}
+         "apot4": 4.5, "lut4_bof4fit": 4.5, "lut4_lloyd_g64": 8.0, "lut4_lloyd_row": None,
+         "iq4nl": 4.5,       # 4-bit codes + fp16 d per 32 (GGUF block_iq4_nl = 18 B / 32)
+         "bcq3_g128": 3.5}   # 3 sign planes + 3 fp16 alpha + fp16 z per 128
 
 def nominal_bpw(fmt, K):
     if fmt is None:
@@ -466,6 +536,10 @@ for _m, _f in [("w3_nf3_g64", "nf3"), ("w4_fp4_g32", "fp4_g32"), ("w4_fp4_g64", 
                ("w4_lut4_lloyd_g64", "lut4_lloyd_g64"), ("w4_lut4_lloyd_row", "lut4_lloyd_row")]:
     MODES[_m] = {"default": (_f, None), "gdn": (_f, None)}
 LUT_MODES = [m for m in MODES if m not in LEGACY_MODES]
+# ASIC-verified weight-only formats (definitions from /home/bhat/asic/v2/isa_sim gen.py / ref.py)
+for _m, _f in [("w4_iq4nl_g32", "iq4nl"), ("w3_bcq3_g128", "bcq3_g128")]:
+    MODES[_m] = {"default": (_f, None), "gdn": (_f, None)}
+ASIC_MODES = ["w4_iq4nl_g32", "w3_bcq3_g128"]
 
 # ----------------------------------------------------------------------------- module replacement
 
@@ -578,8 +652,9 @@ def eval_ppl(model, tok, tokens=4096, seqlen=512, device="cuda"):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--modes", nargs="+", default=LEGACY_MODES, choices=list(MODES) + ["lut"],
-                    help="'lut' expands to the weight-only LUT/codebook family incl. bf16 and w4_nf4_g64")
+    ap.add_argument("--modes", nargs="+", default=LEGACY_MODES, choices=list(MODES) + ["lut", "asic"],
+                    help="'lut' expands to the weight-only LUT/codebook family incl. bf16 and w4_nf4_g64; "
+                         "'asic' to bf16 + the isa_sim-verified IQ4_NL / BCQ modes")
     ap.add_argument("--tokens", type=int, default=4096)
     ap.add_argument("--seqlen", type=int, default=512)
     ap.add_argument("--exclude-gdn", action="store_true", help="leave linear_attn.* (GDN) linears BF16")
@@ -594,7 +669,8 @@ def main():
         sys.exit(run_self_tests())
     modes = []
     for m in a.modes:
-        for x in (["bf16", "w4_nf4_g64"] + LUT_MODES if m == "lut" else [m]):
+        exp = {"lut": ["bf16", "w4_nf4_g64"] + LUT_MODES, "asic": ["bf16"] + ASIC_MODES}
+        for x in exp.get(m, [m]):
             if x not in modes:
                 modes.append(x)
     a.modes = modes
@@ -981,6 +1057,141 @@ class QuantizerTests(unittest.TestCase):
         cov = apply_mode(M(), "bf16")
         self.assertIsNone(cov["w_bpw_replaced"])
         self.assertNotIn("lut", MODES); self.assertEqual(LEGACY_MODES[-1], "w4a4_m2xfp")
+
+    # ---------------------------------------------------------------- ASIC isa_sim formats
+    ISA_SIM = "/home/bhat/asic/v2/isa_sim"
+
+    @classmethod
+    def _isa(cls):
+        """Import the local ASIC simulator's gen.py / ref.py / ggml_tables.py (numpy only)."""
+        import os
+        if not os.path.isfile(os.path.join(cls.ISA_SIM, "ref.py")):
+            raise unittest.SkipTest(f"{cls.ISA_SIM} not present")
+        if cls.ISA_SIM not in sys.path:
+            sys.path.insert(0, cls.ISA_SIM)
+        import gen, ref, ggml_tables
+        return gen, ref, ggml_tables
+
+    @staticmethod
+    def _feed(gen, rows):
+        """Make gen.weights() return the given float32 rows (instead of random draws)."""
+        import numpy as np
+        it = iter(rows)
+        orig = gen.weights
+        gen.weights = lambda rng, r, c, outlier_frac=0.0: np.asarray(next(it), np.float32).reshape(r, c)
+        return orig
+
+    def _asic_inputs(self, cols):
+        g = torch.Generator().manual_seed(7)
+        xs = [torch.randn(4, cols, generator=g) * torch.exp(torch.randn(4, 1, generator=g) * 0.5),
+              torch.randn(3, cols, generator=g) * torch.logspace(-3, 1, cols),
+              torch.randn(2, cols, generator=g).pow(3) * 0.02,
+              torch.randn(4, cols, generator=g).bfloat16().float() * 0.05]   # bf16 weights, like Qwen
+        xs[0][0, 5] = 0.0; xs[0][1, :32] = 0.0                                 # all-zero IQ4 block
+        return xs
+
+    def test_iq4nl_table_matches_isa_sim(self):
+        _, _, GT = self._isa()
+        self.assertEqual(KVALUES_IQ4NL, GT.KVALUES_IQ4NL)
+        self.assertTrue(torch.equal(IQ4NL_GRID, torch.tensor(GT.KVALUES_IQ4NL, dtype=torch.float32)))
+
+    def test_iq4nl_matches_isa_sim_gen_ref(self):
+        """Per block: our codes / fp16 d == bytes packed by isa_sim gen_iq4nl, and our dequant ==
+        isa_sim ref_iq4nl (llama.cpp dequantize_row_iq4_nl) bit-exactly."""
+        import numpy as np
+        gen, ref, _ = self._isa()
+        # exact-tie block: d = 2^-4 (absmax 127/16 is fp16-exact), other elements on every
+        # code midpoint and every code -> x/d exact in FP32, so the tie rule is exercised
+        mids = (IQ4NL_GRID[1:] + IQ4NL_GRID[:-1]) / 2
+        tie = torch.cat([torch.tensor([127.0]), mids, IQ4NL_GRID]).view(1, 32) / 16
+        for x in self._asic_inputs(96) + [torch.cat([tie, -tie])]:
+            blocks = x.reshape(-1, 32).numpy()
+            orig = self._feed(gen, list(blocks))
+            try:
+                p = gen.gen_iq4nl(np.random.default_rng(0), nblocks=len(blocks))
+            finally:
+                gen.weights = orig
+            exact, kern = ref.ref_iq4nl(p)
+            want = torch.tensor([float(v) for v in kern], dtype=torch.float32).reshape(x.shape)
+            self.assertTrue(torch.equal(q_iq4nl(x), want))
+            d, codes, _ = iq4nl_encode(x)
+            buf = p["buf"]["x"].reshape(-1, 18)
+            d_ref = torch.from_numpy(buf[:, :2].copy().view(np.float16).astype(np.float32)).reshape(d.shape)
+            self.assertTrue(torch.equal(d, d_ref))
+            qs = torch.from_numpy(buf[:, 2:].astype(np.int64))
+            c_ref = torch.cat([qs & 0xF, qs >> 4], -1).reshape(codes.shape)
+            self.assertTrue(torch.equal(codes, c_ref))
+
+    def test_iq4nl_handworked(self):
+        # absmax 12.7 -> d = fp16(0.1); x/d: 12.7 -> ~127 -> 113 (largest positive code, the
+        # grid is asymmetric), -12.7 -> -127, 0 -> 1 (no exact zero), 7 = midpoint(1,13) -> 1
+        d = float(torch.tensor(0.1).half())
+        x = torch.tensor([[12.7, -12.7, 0.0, 6.0 * d, 7.0 * d, 7.5 * d] + [0.0] * 26])
+        q = q_iq4nl(x)[0, :6] / d
+        self.assertEqual(q.round().tolist(), [113.0, -127.0, 1.0, 1.0, 1.0, 13.0])
+        self.assertTrue(torch.equal(q_iq4nl(torch.zeros(2, 64)), torch.zeros(2, 64)))
+        x = torch.randn(3, 70)                                     # padding path
+        self.assertEqual(q_iq4nl(x).shape, x.shape)
+        g = torch.randn(256, 512)
+        rel = ((q_iq4nl(g) - g).norm() / g.norm()).item()
+        self.assertLess(rel, 0.12)
+
+    def test_bcq_matches_isa_sim_gen_ref(self):
+        """Our greedy fit == isa_sim gen_bcq (bits, fp16 alpha, fp16 z) and our dequant ==
+        isa_sim ref_bcq FP32 'kernel' value bit-exactly; exact (Fraction) value within FP32 ulp."""
+        import numpy as np
+        gen, ref, _ = self._isa()
+        for x in self._asic_inputs(256):
+            R = x.shape[0]
+            orig = self._feed(gen, [x.numpy()])
+            try:
+                p = gen.gen_bcq(np.random.default_rng(0), rows=R, cols=256, g=128, k=3)
+            finally:
+                gen.weights = orig
+            exact, kern = ref.ref_bcq(p)
+            want = torch.tensor([float(v) for v in kern], dtype=torch.float32).reshape(x.shape)
+            self.assertTrue(torch.equal(q_bcq(x), want))
+            bits, alpha, z, _ = bcq_encode(x)
+            a_ref = torch.from_numpy(p["buf"]["a"].copy().view(np.float16).astype(np.float32)).reshape(alpha.shape)
+            z_ref = torch.from_numpy(p["buf"]["z"].copy().view(np.float16).astype(np.float32)).reshape(z.shape)
+            self.assertTrue(torch.equal(alpha, a_ref)); self.assertTrue(torch.equal(z, z_ref))
+            b_ref = torch.from_numpy(np.unpackbits(p["buf"]["b"], bitorder="little")[:3 * R * 256].astype(bool))
+            self.assertTrue(torch.equal(bits.reshape(-1), b_ref))
+            ex = torch.tensor([float(v) for v in exact]).reshape(x.shape)
+            self.assertLessEqual((ex - want).abs().max().item(), 2 * want.abs().max().item() * 2 ** -23)
+
+    def test_bcq_fit_properties(self):
+        x = torch.randn(16, 300) * torch.exp(torch.randn(16, 1))   # K % 128 != 0 -> padding
+        q = q_bcq(x)
+        self.assertEqual(q.shape, x.shape)
+        self.assertTrue(torch.equal(q_bcq(x), q))
+        qb, _ = _blocks(q, 128)
+        for r in range(16):
+            for j in range(3):
+                n = 128 if j < 2 else 300 - 256
+                self.assertLessEqual(len(qb[r, j, :n].unique()), 8)      # <= 2^3 levels per group
+        # greedy planes: error decreases monotonically with k; 3-plane better than 1-plane
+        g = torch.randn(64, 512)
+        errs = [(q_bcq(g, 128, k) - g).pow(2).sum().item() for k in (1, 2, 3, 4)]
+        self.assertTrue(all(a > b for a, b in zip(errs, errs[1:])), errs)
+        # 1 plane + offset on {mu-a, mu+a} two-valued data is lossless (fp16-exact values)
+        w = torch.tensor([[0.5, 1.5] * 64])
+        self.assertTrue(torch.equal(q_bcq(w, 128, 1), w))
+        self.assertTrue(torch.equal(q_bcq(torch.zeros(2, 128)), torch.zeros(2, 128)))
+        # padded group: mean / alpha use only the real columns
+        w = torch.tensor([[2.0, 4.0]])
+        self.assertTrue(torch.equal(q_bcq(w, 128, 1), w))
+
+    def test_asic_modes_coverage(self):
+        lin = nn.Linear(256, 16, bias=False)
+        x = torch.randn(3, 256)
+        for m, bpw in (( "w4_iq4nl_g32", 4.5), ("w3_bcq3_g128", 3.5)):
+            wf, af = MODES[m]["default"]
+            self.assertIsNone(af)
+            ql = QLinear(lin, wf, af, torch.float32)
+            self.assertTrue(torch.allclose(ql(x), F.linear(x, QUANT[wf](lin.weight.float())), atol=1e-5))
+            self.assertEqual(apply_mode(nn.Sequential(nn.Linear(256, 8)), m)["w_bpw_replaced"], bpw)
+        self.assertNotIn("w4_iq4nl_g32", LUT_MODES); self.assertEqual(LEGACY_MODES[-1], "w4a4_m2xfp")
 
     def test_m2xfp_mode(self):
         lin = nn.Linear(64, 8, bias=True)

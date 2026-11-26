@@ -141,6 +141,41 @@ stores its own 16 BF16 entries, so it is an upper bound and not a 4-bit format. 
 is RTN only (no GPTQ/AWQ), fake-quantized with a BF16 matmul. GDN linears are quantized
 unless `--exclude-gdn` is set, and lm_head stays BF16.
 
+### ASIC-verified weight-only formats (`--modes asic`)
+
+These two formats are defined in the local ASIC ISA simulator `/home/bhat/asic/v2/isa_sim`
+(commit `2039157`): its quantizers are in `gen.py` and its dequantizers in `ref.py`. The
+self-tests import those files and use them as oracles. Each small tensor is passed through
+`gen.gen_iq4nl` / `gen.gen_bcq` in place of their random weights, unpacked with
+`ref.ref_iq4nl` / `ref.ref_bcq`, and compared with `torch.equal`. The comparison covers
+the codes, bits, fp16 scales and offsets, and the dequantized FP32 values. The inputs are
+heavy-row, wide-range, heavy-tailed and bf16 data, an all-zero block, and an IQ4 block
+placed exactly on code midpoints. Mutation checks were run to confirm that the tests
+fail when the tie rule or the fp16 rounding of α is changed.
+
+| Mode | Definition | bpw | PPL (4,096 tok) | ‖W−Q‖²/‖W‖² |
+|---|---|---:|---:|---:|
+| `w4_iq4nl_g32` | GGUF IQ4_NL: `kvalues_iq4nl` (verbatim from llama.cpp via `ggml_tables.py`). Per 32 weights, `d = fp16(absmax/127)` and `code = nearest(x/d)`, with exact midpoint ties going to the lower code. Dequant is `f32(d)·kvalues[code]` | 4.5 | **22.609** | 0.0078 |
+| `w3_bcq3_g128` | BCQ / LUT-GEMM, per output row × 128 input columns: `z = fp16(mean)`, then for 3 planes `b = (res ≥ 0)`, `α = fp16(mean\|res\|)`, `res -= α(2b−1)`. Dequant is the FP32 sum of ±α in plane order, then `+ z` | 3.5 | 245.80 | 0.0659 |
+
+The BF16 control in the same run gives 21.168, and GDN linears are quantized in both modes.
+Raw results are in `results/asic_iq4nl_bcq_4096.json`. For reference, NF4 g64 with the same
+coverage gives 23.441 PPL and 0.0087 relative error.
+
+Caveats:
+1. IQ4_NL follows the simulator's generator rule, not llama.cpp's `quantize_row_iq4_nl`.
+   llama.cpp uses a signed max (`d = max/−127`), a ±7-step scale search, and an optional
+   imatrix weighting, so real GGUF IQ4_NL is probably a little better. The table, block
+   layout, fp16 scale and dequant are the same as in llama.cpp.
+2. BCQ uses the plain greedy residual fit that the simulator defines. It has no
+   alternating refinement of α and the bits (Xu et al. 2018; LUT-GEMM/ShiftAddLLM use better
+   fits or calibration). Greedy α is the mean residual magnitude, which is not least-squares
+   optimal once the planes interact. Its weight relative error (0.066) is worse than NF3 g64
+   (0.042, PPL 36.3) and 3-bit min-max INT3 g128 (0.051, weight error only, no PPL run).
+   So the 245.8 is a fair result for *greedy* RTN BCQ at 3 bits on this model, not a bug.
+   It should not be read as a bound on what BCQ can achieve. Padded tail columns are left
+   out of the means, which never happens for Qwen3.5 since K is a multiple of 128.
+
 ## MR-GPTQ (`mr_gptq/`)
 
 Port of IST-DASLab/FP-Quant MR-GPTQ (Hadamard + GPTQ on MXFP4/NVFP4 grids) to the Qwen3.5

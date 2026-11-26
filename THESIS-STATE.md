@@ -172,3 +172,12 @@ The obvious architecture directions are already crowded: Continuous Depth Batchi
 A software kill test in `looped/` evaluated Ouro-1.4B's four recurrent outputs over 3,072 WikiText-2 next-token positions on the RTX 4090. Latency scales almost exactly with loop count (1.00/1.99/2.97/3.96x). There is substantial oracle variability: 49.8/22.1/16.8/11.3% of tokens first agree with depth 4 at depths 1/2/3/4, for a 1.91-step oracle average. But the released learned gate chooses depth 4 for 90.4% of tokens and matches that oracle only 12.2%. A held-out calibrated logit-margin policy preserves 99.0% depth-4 top-1 agreement while using 3.236 steps, only ~1.24x ideal recurrent-compute savings before scheduling and gate overhead; it also requires an impractical intermediate vocabulary projection.
 
 **Verdict:** kill generic looped-model scheduling/fusion/fixed-loop FPGA acceleration. The only conditional survivor is a tiny hidden-state exit gate plus hardware-slack-aware execution. Continue only if a cheap gate reaches <=2.6 mean steps at >=99% depth-4 agreement (~1.5x ideal recurrent-compute reduction) on reasoning tasks. FPGA access cannot be required for the initial test.
+
+## 12. Looped MoE revisited: Inkling 2 Mini (2026-11-26)
+
+The Ouro kill test covered only a small dense looped model. Inkling 2 Mini (Thinking Machines, 2026-11-20) is a looped
+MoE model (26.4B total / 3.4B active, layers 6-17 run 3x, 8 of 128 experts) aimed at Macs and the Spark. Cross-pass
+on-chip weight reuse and fewer-pass self-speculation look dead on paper. Three cheap questions remain open: expert
+overlap across passes (enables loop-aware expert offload/prefetch: the hardware-relevant one), KV sharing across passes,
+and per-token pass count with the variable-loop checkpoint. Analysis, kill criteria and the proposed A100 experiment
+are in `looped/INKLING.md`. Nothing run yet.

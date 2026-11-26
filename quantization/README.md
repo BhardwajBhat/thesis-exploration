@@ -68,3 +68,9 @@ the official harness runs FP16 with matmul in FP16 while this one uses BF16, and
 dequantized values are exact in either. Official quantizes only linears inside decoder blocks;
 here lm_head is likewise BF16 by default, but GDN linears are quantized unless `--exclude-gdn`.
 RTN plus scale search only: no GPTQ or rotation. Not run on the model yet.
+
+## MR-GPTQ (`mr_gptq/`)
+
+Port of IST-DASLab/FP-Quant MR-GPTQ (Hadamard + GPTQ on MXFP4/NVFP4 grids) to the Qwen3.5
+hybrid, evaluated on this protocol. Smoke (8x512 calib): W4A4 MXFP4 30.33 -> 25.23,
+W4A4 NVFP4 24.81 -> 23.65 (GPTQ, no rotation; Had16 gives 24.66). See `mr_gptq/README.md`.

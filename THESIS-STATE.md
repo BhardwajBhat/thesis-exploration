@@ -180,4 +180,6 @@ MoE model (26.4B total / 3.4B active, layers 6-17 run 3x, 8 of 128 experts) aime
 on-chip weight reuse and fewer-pass self-speculation look dead on paper. Three cheap questions remain open: expert
 overlap across passes (enables loop-aware expert offload/prefetch: the hardware-relevant one), KV sharing across passes,
 and per-token pass count with the variable-loop checkpoint. Analysis, kill criteria and the proposed A100 experiment
-are in `looped/INKLING.md`. Nothing run yet.
+are in `looped/INKLING.md`.
+
+**Expert overlap (question 1) run 2026-11-26 on yellowstone A100 GPU 2: killed.** BF16 (dequantized on load, 52.8 GB), 16 prompts (chat/code/math/tool), 81k token-layers: 14.1 unique experts per token per looped layer over 3 passes (floor 8, random 22.5; kill line ~12); 4.7 of 8 shared between consecutive passes, 3.65 between passes 1 and 3; exact set reuse 2%; pass-1 top-16 covers 78% / 64% of pass-2 / pass-3 experts. Prior blog (noamshh.github.io/blog/inkling-loop-routing, 14.5M tokens) already reports the same (3.4-5.6 of 8 shared). KV sharing and pass count not started. Details: `looped/inkling/README.md`.

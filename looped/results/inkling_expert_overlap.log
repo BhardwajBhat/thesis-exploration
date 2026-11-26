@@ -1,0 +1,22 @@
+[transformers] Unknown quantization type, got modelopt - supported types are: ['awq', 'bitsandbytes_4bit', 'bitsandbytes_8bit', 'gptq', 'aqlm', 'quanto', 'quark', 'fouroversix', 'fp_quant', 'eetq', 'higgs', 'hqq', 'compressed-tensors', 'fbgemm_fp8', 'torchao', 'bitnet', 'vptq', 'spqr', 'fp8', 'gguf', 'nvfp4', 'mxfp8', 'auto-round', 'mxfp4', 'metal', 'sinq', 'gemma']. Hence, we will skip the quantization. To remove the warning, you can delete the quantization_config attribute in config.json
+Loading weights:   0%|          | 0/1115 [00:00<?, ?it/s]Loading weights:   4%|▍         | 49/1115 [00:00<00:03, 320.20it/s]Loading weights:   7%|▋         | 82/1115 [00:00<00:09, 113.69it/s]Loading weights:   9%|▉         | 100/1115 [00:00<00:10, 98.23it/s]Loading weights:  11%|█         | 125/1115 [00:01<00:09, 99.91it/s]Loading weights:  12%|█▏        | 137/1115 [00:01<00:10, 95.71it/s]Loading weights:  15%|█▍        | 167/1115 [00:01<00:07, 119.03it/s]Loading weights:  18%|█▊        | 201/1115 [00:01<00:06, 141.82it/s]Loading weights:  21%|██        | 234/1115 [00:01<00:05, 153.49it/s]Loading weights:  24%|██▍       | 266/1115 [00:01<00:05, 164.03it/s]Loading weights:  27%|██▋       | 298/1115 [00:02<00:04, 168.17it/s]Loading weights:  30%|██▉       | 330/1115 [00:02<00:04, 177.52it/s]Loading weights:  33%|███▎      | 364/1115 [00:02<00:04, 186.41it/s]Loading weights:  36%|███▌      | 398/1115 [00:02<00:03, 191.67it/s]Loading weights:  39%|███▊      | 430/1115 [00:02<00:03, 192.53it/s]Loading weights:  41%|████▏     | 462/1115 [00:02<00:03, 189.54it/s]Loading weights:  47%|████▋     | 525/1115 [00:03<00:02, 240.27it/s]Loading weights:  50%|█████     | 559/1115 [00:03<00:02, 227.97it/s]Loading weights:  52%|█████▏    | 582/1115 [00:03<00:03, 160.10it/s]Loading weights:  56%|█████▌    | 621/1115 [00:04<00:04, 115.73it/s]Loading weights:  59%|█████▉    | 661/1115 [00:04<00:05, 88.68it/s] Loading weights: 100%|██████████| 1115/1115 [00:04<00:00, 226.83it/s]
+loop layers 6 18 passes 3
+[transformers] `causal_conv1d_fn` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `causal_conv1d_update` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[1/16] chat prompt=30 total=414 gen=75s
+[2/16] chat prompt=30 total=414 gen=76s
+[3/16] chat prompt=30 total=298 gen=53s
+[4/16] chat prompt=30 total=231 gen=38s
+[5/16] code prompt=31 total=415 gen=73s
+[6/16] code prompt=35 total=419 gen=74s
+[7/16] code prompt=53 total=437 gen=74s
+[8/16] code prompt=40 total=377 gen=66s
+[9/16] math prompt=39 total=395 gen=72s
+[10/16] math prompt=35 total=419 gen=77s
+[11/16] math prompt=28 total=412 gen=78s
+[12/16] math prompt=27 total=411 gen=79s
+[13/16] tool prompt=443 total=566 gen=25s
+[14/16] tool prompt=438 total=536 gen=20s
+[15/16] tool prompt=436 total=528 gen=18s
+[16/16] tool prompt=441 total=507 gen=13s
+wrote out/raw_routing.pt

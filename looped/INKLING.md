@@ -3,7 +3,7 @@
 The Ouro kill test (`README.md`) only covered a small dense looped model, where looping adds compute and
 nothing else. Thinking Machines' **Inkling 2 Mini** (released 2026-11-20, Apache 2.0) is a looped
 **MoE** model aimed at local hardware, which raises memory-system questions the Ouro test could not.
-No experiments have been run yet; this file holds the analysis and the proposed first measurement.
+**Update 2026-11-26: question 1 run on yellowstone, dead** (mean 14.1 unique experts over 3 passes vs kill line ~12; also already measured on 14.5M tokens by noamshh.github.io/blog/inkling-loop-routing). See `inkling/README.md`.
 
 ## Facts (official blog + HF card unless marked)
 

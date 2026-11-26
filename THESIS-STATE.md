@@ -192,3 +192,15 @@ Qwen3-4B single-agent traces (yellowstone GPU 2; 26 τ², 17 BFCL tasks) replaye
 second stream and free prefill, 1.10x [1.06, 1.16] on τ² and 1.27x [1.20, 1.35] on BFCL; at the estimated +20% batch-2
 step cost 1.03x / 1.10x with 3% / 8% energy saving (thresholds 1.3x, 15%). Causes: 4B exact-guess rate 0.40 on τ²;
 depth-1 overlap is capped by short next turns; ~10 ms per-stream fixed cost on KV260. Details: `edge_stride/README.md`.
+
+## 14. Broad search and handoff (2026-11-26, yellowstone session)
+
+Six parallel research subagents (edge agents, FPGA LLM, serving memory, numerics, robotics, wildcard); nothing strong.
+Ranked shortlist with checked demand and kill tests: `search_20261126/README.md`. Top four (medium):
+1. Host->GPU KV-load path (copy-engine stalls, per-machine DMA vs SM copy; vllm#65515, #57555). Recommended first test (A100 GPUs 2/3 + 4090).
+2. Qwen3.5 MTP head as a resident PL drafter on the KV260.
+3. Idle-aware KV260 engine (PL power-down between bursts). Cheap parallel check on the KV260 power rig.
+4. Dual-system VLA on one Versal (narrower M).
+Dropped: multi-LoRA on an FPGA base (AMD Ryzen AI 1.9 Dynamic LoRA, 2026-11-02). Newly taken: MXFP4 on FPGA (Cruella 2611.27323).
+Yellowstone state: all GPUs released; venv `~/.venvs/inkling` (transformers 5.24.1) kept; worktree `~/clod/te-joshua` on joshua-tree.
+User continues from the ISALab hub. No kill test from this shortlist has been run yet.
